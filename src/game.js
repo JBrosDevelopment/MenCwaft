@@ -31,6 +31,11 @@ let lastTime = 0;
 
 let blockOutlineData = BLOCK_OUTLINE.createBlockOutline(scene);
 
+player.setBlockinHotbar(0, "gras");
+player.setBlockinHotbar(1, "dir");
+player.setBlockinHotbar(2, "cob");
+player.setBlockinHotbar(3, "bedroc");
+
 function RenderFrame(time) {
     if (time === undefined) time = 0;
     const delta = (time - lastTime) / 1000;

@@ -13,6 +13,8 @@ class Player {
         this.camera.rotation.order = "YXZ";
         this.camera.position.copy(this.position);
         this.blockCooldown = 0;
+        this.selectedBlockIndex = 0;
+        this.hotbar = new Array(9).fill(null);
     }
 
     update(delta, world) {
@@ -32,6 +34,41 @@ class Player {
         if (INPUT_MANAGER.mouse.right) {
             this.placeBlock(world);
         }
+
+        if (INPUT_MANAGER.mouse.scrollDelta !== 0) {
+            const scrollDirection = Math.sign(INPUT_MANAGER.mouse.scrollDelta);
+            this.selectedBlockIndex = (this.selectedBlockIndex + scrollDirection + 9) % 9;
+            INPUT_MANAGER.mouse.scrollDelta = 0;
+        }
+        updateHotbar(this);
+    }
+
+    setBlockinHotbar(index, blockType) {
+        if (index < 0 || index > 8) return;
+    
+        const block = BLOCK_MANAGER.BLOCKS[blockType];
+        if (!block) return;
+    
+        const slot = document.getElementById(`hotbar-slot-${index}`);
+        if (!slot) return;
+    
+        const TILE_SIZE = 128;     // each tile is 128×128
+        const ATLAS_SIZE = 1024;   // 8×8 tiles → 1024px atlas
+        const SLOT_SIZE = 48;      // hotbar slot size
+    
+        const SCALE = SLOT_SIZE / TILE_SIZE; // 0.375
+        const SCALED_ATLAS = ATLAS_SIZE * SCALE; // 384px
+    
+        const [ u, v ] = (block.unique_sides) ? block.tex.top : block.tex;
+
+        const x = -(u * TILE_SIZE * SCALE);
+        const y = -(v * TILE_SIZE * SCALE);
+    
+        slot.style.backgroundImage = "url('textures/default/blocks.png')";
+        slot.style.backgroundSize = `${SCALED_ATLAS}px ${SCALED_ATLAS}px`;
+        slot.style.backgroundPosition = `${x}px ${y}px`;
+
+        this.hotbar[index] = blockType;
     }
 
     breakBlock(world) {
@@ -49,9 +86,15 @@ class Player {
     
         const { x, y, z } = getBlockCoords(target, true);
     
-        world.setBlock(x, y, z, BLOCK_MANAGER.BLOCKS["bedroc"]); 
+        const blockType = this.hotbar[this.selectedBlockIndex];
+        if (!blockType) return;
+        world.setBlock(x, y, z, BLOCK_MANAGER.BLOCKS[blockType]); 
     }
     
+    editHotbar(index) {
+        if (index < 0 || index > 8) return;
+        this.selectedBlockIndex = index;
+    }
 }
 
 function getTargetBlock(camera, scene) {
@@ -88,4 +131,24 @@ function getBlockCoords(hit, placing) {
     };
 }
 
-export const PLAYER_MANAGER = { Player, getTargetBlock, getBlockCoords };
+const hotbarElement = document.getElementById("hotbar");
+const hotbarSlots = [];
+function createHotBar() {
+    for (let i = 0; i < 9; i++) {
+        const slot = document.createElement("div");
+        slot.className = "hotbar-slot";
+        slot.id = `hotbar-slot-${i}`;
+        hotbarElement.appendChild(slot);
+        hotbarSlots.push(slot);
+    }
+}
+createHotBar();
+
+function updateHotbar(player) {
+    hotbarSlots.forEach((slot, i) => {
+        slot.classList.toggle("selected", i === player.selectedBlockIndex);
+    });
+}
+
+
+export const PLAYER_MANAGER = { Player, getTargetBlock, getBlockCoords, createHotBar, updateHotbar };

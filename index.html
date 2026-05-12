@@ -43,8 +43,50 @@
     width: 18px;
     height: 2px;
 }
+#hotbar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    display: flex;
+    gap: 6px;
+
+    padding: 8px;
+    background: rgba(20, 20, 20, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+
+    z-index: 999;
+}
+
+.hotbar-slot {
+    width: 48px;
+    height: 48px;
+
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 18px;
+    color: white;
+    user-select: none;
+}
+
+.hotbar-slot.selected {
+    border-color: white;
+    background: rgba(255, 255, 255, 0.15);
+    border: 4px solid white;
+    padding: 1px;
+}
 </style>
 <body>
     <div id="crosshair"></div>
+    <div id="hotbar">
+    </div>
+    
 </body>
 <canvas id="c"></canvas>

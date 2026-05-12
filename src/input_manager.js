@@ -18,7 +18,8 @@ const keys = {
 const mouse = {
     left: false,
     right: false,
-    middle: false
+    middle: false,
+    scrollDelta: 0,
 }
 
 let yaw = 0;
@@ -78,6 +79,10 @@ document.addEventListener("mousemove", (event) => {
     pitch -= event.movementY * SETTINGS.MOUSE_SENSITIVITY;
     
     pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+});
+
+document.addEventListener("wheel", (event) => {
+    mouse.scrollDelta = event.deltaY;
 });
 
 function isKeyPressed(key) {
