@@ -10,7 +10,9 @@ const keys = {
     Shift: false,
     Control: false,
     Escape: false,
-    Enter: false
+
+    Enter: false,
+    r: false,
 };
 
 const mouse = {

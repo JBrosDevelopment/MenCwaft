@@ -4,6 +4,9 @@ import { BLOCK_MANAGER } from "./block_manager.js";
 import { ATMOSPHERE } from "./atmosphere.js";
 import { PLAYER_MANAGER } from './player_manager.js';
 import { INPUT_MANAGER } from './input_manager.js';
+import { BLOCK_OUTLINE } from './block_outline.js';
+
+BLOCK_OUTLINE.updateCrosshair();
 
 const scene = new THREE.Scene();
 
@@ -25,6 +28,8 @@ chunkManager.update(player.position);
 let lastChunkX, lastChunkZ = 0;
 
 let lastTime = 0;
+
+let blockOutlineData = BLOCK_OUTLINE.createBlockOutline(scene);
 
 function RenderFrame(time) {
     if (time === undefined) time = 0;
@@ -49,6 +54,13 @@ function RenderFrame(time) {
     if (INPUT_MANAGER.isKeyPressed("Enter")) {
         chunkManager.saveWorld();
     }
+
+    if (INPUT_MANAGER.isKeyPressed("r")) {
+        chunkManager.resetWorld();
+        console.log("World reset!");
+    }
+
+    BLOCK_OUTLINE.updateBlockOutline(player.camera, scene, blockOutlineData);
 
     player.update(delta, chunkManager);
 

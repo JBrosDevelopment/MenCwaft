@@ -23,5 +23,5 @@ export const SETTINGS = {
     FOG_NEAR: 10,
     FOG_FAR: 250,
     DAY_SPEED: 0.01, 
-    
+    BLOCK_REACH: 5,
 }

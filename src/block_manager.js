@@ -166,7 +166,7 @@ function RenderChunk(scene, chunkData, chunkX, chunkZ) {
         ) {
             return true; // outside chunk = air
         }
-        return chunkData[x][y][z] === BLOCKS["air"];
+        return chunkData[x][y][z].id === 0;
     }
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -327,16 +327,18 @@ class ChunkManager {
     }
 
     rebuildChunk(chunk) {
+        const wx = chunk.x * CHUNK_SIZE;
+        const wz = chunk.z * CHUNK_SIZE;
+        
+        const mesh_rebuilt = RenderChunk(this.scene, chunk.data, wx, wz);
+
         if (chunk.mesh) {
             this.scene.remove(chunk.mesh);
             chunk.mesh.geometry.dispose();
             chunk.mesh.material.dispose();
         }
     
-        const wx = chunk.x * CHUNK_SIZE;
-        const wz = chunk.z * CHUNK_SIZE;
-    
-        chunk.mesh = RenderChunk(this.scene, chunk.data, wx, wz);
+        chunk.mesh = mesh_rebuilt;
     }    
     
     loadChunk(cx, cz) {
@@ -344,7 +346,6 @@ class ChunkManager {
         const wz = cz * CHUNK_SIZE;
     
         const data = GenerateChunk(wx, wz);
-        const mesh = RenderChunk(this.scene, data, wx, wz);
 
         const key = chunkKey(cx, cz);
     
@@ -356,6 +357,7 @@ class ChunkManager {
                 data[lx][wy][lz] = block;
             }
         }
+        const mesh = RenderChunk(this.scene, data, wx, wz);
     
         const chunk = new Chunk(cx, cz, data, mesh);
         this.chunks.set(chunkKey(cx, cz), chunk);
@@ -430,7 +432,16 @@ class ChunkManager {
                 new Map(Object.entries(parsed[chunkKey]))
             );
         }
-    }    
+    } 
+
+    resetWorld() {
+        this.modifiedChunks.clear();
+        localStorage.removeItem("world_mods");
+        for (const chunk of this.chunks.values()) {
+            chunk.dirty = true;
+            chunk.data = GenerateChunk(chunk.x * CHUNK_SIZE, chunk.z * CHUNK_SIZE);
+        }
+    }
 }
 
 function getAffectedChunks(wx, wy, wz) {

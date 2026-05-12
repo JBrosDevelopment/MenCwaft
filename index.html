@@ -5,7 +5,46 @@
     <script src="src/block_manager.js" type="module"></script>
     <script src="src/atmosphere.js" type="module"></script>
     <script src="src/player_manager.js" type="module"></script>
+    <script src="src/block_outline.js" type="module"></script>
     <script src="src/game.js" type="module"></script>
     <title>MenCwaft - The Game</title>
 </head>
+<style>
+#crosshair {
+    position: fixed;
+
+    width: 18px;
+    height: 18px;
+
+    z-index: 1000;
+    pointer-events: none;
+
+    filter: drop-shadow(0 0 2px black);
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: "";
+
+    position: absolute;
+    background: white;
+}
+
+#crosshair::before {
+    left: 8px;
+    top: 0;
+    width: 2px;
+    height: 18px;
+}
+
+#crosshair::after {
+    left: 0;
+    top: 8px;
+    width: 18px;
+    height: 2px;
+}
+</style>
+<body>
+    <div id="crosshair"></div>
+</body>
 <canvas id="c"></canvas>
