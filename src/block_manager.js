@@ -1,5 +1,7 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { createNoise2D } from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
 import { SETTINGS } from "./settings.js";
+import { BIOME_MANAGER } from './boime_manager.js';
 
 const BLOCKS = {
     air:        { id: 0 },
@@ -7,11 +9,14 @@ const BLOCKS = {
     dir:        { id: 2, tex: [3, 0], unique_sides: false },
     cob:        { id: 3, tex: [2, 0], unique_sides: false },
     bedroc:     { id: 4, tex: [1, 0], unique_sides: false },
+    san:        { id: 5, tex: [6, 0], unique_sides: false },
+    log:        { id: 6, tex: { top: [7, 0], bottom: [7, 0], front: [0, 1], back: [0, 1], left: [0, 1], right: [0, 1] }, unique_sides: true },
+    leaf:        { id: 7, tex: [1, 1], unique_sides: false },
 };
 
 
 const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 64;
+const WORLD_HEIGHT = 128;
 const GROUND_LEVEL = 31;
 const CHUNK_GENERATION_HEIGHT = GROUND_LEVEL + 1;
 
@@ -90,45 +95,196 @@ const FACE_TO_SIDE = {
     nz: "back",
 };
 
-/// Generates a chunk at the specified chunk coordinates
-/// chunkX and chunkZ are multiples of 16
-/// Returns a 3D matrix of block IDs, with dimensions [16][32][16]
-/// X and Z range from chunkX to chunkX + 15 and chunkZ to chunkZ + 15
-/// Y ranges from 0 to 32 (GROUND_LEVEL + 1)
-function GenerateChunk(chunkX, chunkZ) {
-    // chunkX and chunkZ would be used down the line for more complex terrain generation
-    // but for now we just create a flat world
-    // So we just check if they are multiples of 16 and nothing else
+function mulberry32(seed) {
+    return function() {
+        let t = seed += 0x6D2B79F5;
+
+        t = Math.imul(t ^ t >>> 15, t | 1);
+
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
+function fbm(noise2D, x, z, octaves, persistence, lacunarity) {
+    let amplitude = 1;
+    let frequency = 1;
+
+    let value = 0;
+    let max = 0;
+
+    for (let i = 0; i < octaves; i++) {
+        value += noise2D(x * frequency, z * frequency) * amplitude;
+
+        max += amplitude;
+
+        amplitude *= persistence;
+        frequency *= lacunarity;
+    }
+
+    return value / max;
+}
+
+function ridgedFBM(noise2D, x, z, octaves) {
+    let value = 0;
+
+    let amplitude = 0.5;
+    let frequency = 1.0;
+
+    for (let i = 0; i < octaves; i++) {
+
+        let n = noise2D(
+            x * frequency,
+            z * frequency
+        );
+
+        // Ridge transformation
+        n = 1 - Math.abs(n);
+
+        // Sharpen ridges
+        n *= n;
+
+        value += n * amplitude;
+
+        frequency *= 2.0;
+        amplitude *= 0.5;
+    }
+
+    return value;
+}
+
+function smoothstep(edge0, edge1, x) {
+    x = Math.max(
+        0,
+        Math.min(
+            1,
+            (x - edge0) / (edge1 - edge0)
+        )
+    );
+
+    return x * x * (3 - 2 * x);
+}
+
+function GenerateChunk(chunkX, chunkZ, terrainNoise, tempNoise, humidityNoise) {
+
     if (chunkX % CHUNK_SIZE != 0 || chunkZ % CHUNK_SIZE != 0) {
         console.error(`Chunk coordinates: ${chunkX}, ${chunkZ} must be multiples of 16`);
         return null;
     }
-    const gras_level = 31
-    const dir_level = 27
-    const cob_level = 1
-    const bedroc_level = 0
+
+    const SEA_LEVEL = 28;
+    const MAX_TREES_PER_CHUNK = 5;
+    let treesInChunk = 0;
+
     let chunkData = new Array(CHUNK_SIZE);
+
     for (let x = 0; x < CHUNK_SIZE; x++) {
+
         chunkData[x] = new Array(WORLD_HEIGHT);
+
         for (let y = 0; y < WORLD_HEIGHT; y++) {
             chunkData[x][y] = new Array(CHUNK_SIZE);
-            for (let z = 0; z < CHUNK_SIZE; z++) {
-                if (y == bedroc_level) chunkData[x][y][z] = BLOCKS["bedroc"];
-                else if (y > bedroc_level && y < dir_level) chunkData[x][y][z] = BLOCKS["cob"];
-                else if (y >= dir_level && y < gras_level) chunkData[x][y][z] = BLOCKS["dir"];
-                else if (y == gras_level) chunkData[x][y][z] = BLOCKS["gras"];
-                else chunkData[x][y][z] = BLOCKS["air"];
+        }
+
+        for (let z = 0; z < CHUNK_SIZE; z++) {
+            const worldX = chunkX + x;
+            const worldZ = chunkZ + z;
+
+            // BIOME NOISE
+            const temperature = tempNoise(worldX * 0.001, worldZ * 0.001);
+            const humidity = humidityNoise(worldX * 0.001, worldZ * 0.001);
+
+            // BIOME BLENDING
+            const mountainFactor = smoothstep(-0.2, 0.4, -temperature); // Mountains appear in colder regions
+            const desertFactor = smoothstep(0.2, 0.7, temperature) * smoothstep(0.3, -0.3, humidity); // Deserts appear in hot + dry regions
+            const forestFactor = smoothstep(0.1, 0.7, humidity); // Forests appear in humid regions
+            let plainsFactor = 1.0 - Math.max(mountainFactor, desertFactor, forestFactor); // Plains are default
+            
+            plainsFactor = Math.max(plainsFactor, 0);
+
+            // DOMAIN WARPING
+            const warpX = terrainNoise(worldX * 0.002, worldZ * 0.002) * 30;
+            const warpZ = terrainNoise((worldX + 1000) * 0.002, (worldZ + 1000) * 0.002) * 30;
+
+            const nx = worldX + warpX;
+            const nz = worldZ + warpZ;
+
+            // BASE TERRAIN
+            const baseTerrain = fbm(terrainNoise, nx * 0.003, nz * 0.003, 5, 0.5, 2.0);
+            
+            // RIDGED MOUNTAINS
+            const mountains = ridgedFBM(terrainNoise, nx * 0.008, nz * 0.008, 5);
+
+            // BIOME HEIGHTS
+            const plainsHeight = baseTerrain * 8;
+            const forestHeight = baseTerrain * 12;
+            const desertHeight = baseTerrain * 5;
+            const mountainHeight = baseTerrain * 15 + mountains * 45;
+            
+            // FINAL BLENDED HEIGHT
+            const terrainHeight = Math.floor(
+                    plainsHeight * plainsFactor +
+                    forestHeight * forestFactor +
+                    desertHeight * desertFactor +
+                    mountainHeight * mountainFactor
+                ) + SEA_LEVEL;
+
+            // SURFACE BLOCKS
+            let surfaceBlock = "gras";
+            let subsurfaceBlock = "dir";
+
+            if (desertFactor > 0.5) {
+                surfaceBlock = "san";
+                subsurfaceBlock = "san";
+            }
+
+            if (mountainFactor > 0.6) {
+                surfaceBlock = "cob";
+                subsurfaceBlock = "cob";
+            }
+
+            const mountainCobHeight = 45;
+            
+            
+            // GENERATE BLOCKS
+            for (let y = 0; y < WORLD_HEIGHT; y++) {
+
+                if (y === 0) {
+                    chunkData[x][y][z] = BLOCKS["bedroc"];
+                }
+
+                else if (y < terrainHeight - 4) {
+                    chunkData[x][y][z] = BLOCKS["cob"];
+                }
+
+                else if (y < terrainHeight) {
+                    if (mountainFactor > 0.6 && y < mountainCobHeight) {
+                        subsurfaceBlock = "dir"; // for mountains, transition from dir to cob
+                    } 
+                    chunkData[x][y][z] = BLOCKS[subsurfaceBlock];
+                }
+
+                else if (y === terrainHeight) {
+                    if (mountainFactor > 0.6 && y < mountainCobHeight) {
+                       surfaceBlock = "gras"; // for mountains, transition from gras to cob
+                    } 
+                    chunkData[x][y][z] = BLOCKS[surfaceBlock];
+                }
+
+                else {
+                    chunkData[x][y][z] = BLOCKS["air"];
+                }
+            }
+
+            // TREES
+            const treeNoise = terrainNoise(worldX * 0.1, worldZ * 0.1);
+            if (forestFactor > 0.7 && treeNoise > 0.6 && MAX_TREES_PER_CHUNK > treesInChunk && terrainHeight < mountainCobHeight) {
+                chunkData[x][terrainHeight + 1][z] = BLOCKS["log"];
+                treesInChunk++;
             }
         }
     }
-
-    //chunkData[0][0][0] = BLOCKS["bedroc"];
-    //chunkData[0][0][1] = BLOCKS["dir"];
-    //chunkData[0][0][2] = BLOCKS["dir"];
-    //chunkData[0][1][0] = BLOCKS["cob"];
-    //chunkData[0][2][0] = BLOCKS["cob"];
-    //chunkData[1][0][0] = BLOCKS["gras"];
-    //chunkData[2][0][0] = BLOCKS["gras"];
 
     return chunkData;
 }
@@ -166,6 +322,7 @@ function RenderChunk(scene, chunkData, chunkX, chunkZ) {
         ) {
             return true; // outside chunk = air
         }
+        
         return chunkData[x][y][z].id === 0;
     }
 
@@ -277,10 +434,15 @@ class Chunk {
 }
 
 class ChunkManager {
-    constructor(scene) {
+    constructor(scene, seed) {
         this.scene = scene;
         this.chunks = new Map();
         this.modifiedChunks = new Map();
+        this.seed = seed;
+
+        this.terrainNoise = createNoise2D(mulberry32(seed));
+        this.tempNoise = createNoise2D(mulberry32(seed + 1));
+        this.humidityNoise = createNoise2D(mulberry32(seed + 2));
     }
 
     update(playerPosition) {
@@ -345,7 +507,7 @@ class ChunkManager {
         const wx = cx * CHUNK_SIZE;
         const wz = cz * CHUNK_SIZE;
     
-        const data = GenerateChunk(wx, wz);
+        const data = GenerateChunk(wx, wz, this.terrainNoise, this.tempNoise, this.humidityNoise);
 
         const key = chunkKey(cx, cz);
     
@@ -439,7 +601,7 @@ class ChunkManager {
         localStorage.removeItem("world_mods");
         for (const chunk of this.chunks.values()) {
             chunk.dirty = true;
-            chunk.data = GenerateChunk(chunk.x * CHUNK_SIZE, chunk.z * CHUNK_SIZE);
+            chunk.data = GenerateChunk(chunk.x * CHUNK_SIZE, chunk.z * CHUNK_SIZE, this.terrainNoise, this.tempNoise, this.humidityNoise);
         }
     }
 }

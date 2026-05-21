@@ -64,7 +64,7 @@ class Player {
         const x = -(u * TILE_SIZE * SCALE);
         const y = -(v * TILE_SIZE * SCALE);
     
-        slot.style.backgroundImage = "url('textures/default/blocks.png')";
+        slot.style.backgroundImage = `url('textures/${SETTINGS.TEXTURE_PACK}/blocks.png')`;
         slot.style.backgroundSize = `${SCALED_ATLAS}px ${SCALED_ATLAS}px`;
         slot.style.backgroundPosition = `${x}px ${y}px`;
 

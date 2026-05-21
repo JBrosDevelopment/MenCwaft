@@ -5,6 +5,7 @@ import { ATMOSPHERE } from "./atmosphere.js";
 import { PLAYER_MANAGER } from './player_manager.js';
 import { INPUT_MANAGER } from './input_manager.js';
 import { BLOCK_OUTLINE } from './block_outline.js';
+import { BIOME_MANAGER } from './boime_manager.js';
 
 BLOCK_OUTLINE.updateCrosshair();
 
@@ -17,12 +18,12 @@ renderer.setSize(SETTINGS.WIDTH, SETTINGS.HEIGHT);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
 
 const dayCycle = new ATMOSPHERE.DayCycle(scene);
 
-const chunkManager = new BLOCK_MANAGER.ChunkManager(scene);
+const chunkManager = new BLOCK_MANAGER.ChunkManager(scene, SETTINGS.SEED);
 chunkManager.loadWorld();
 chunkManager.update(player.position);
 let lastChunkX, lastChunkZ = 0;
@@ -35,6 +36,9 @@ player.setBlockinHotbar(0, "gras");
 player.setBlockinHotbar(1, "dir");
 player.setBlockinHotbar(2, "cob");
 player.setBlockinHotbar(3, "bedroc");
+player.setBlockinHotbar(4, "san");
+player.setBlockinHotbar(5, "log");
+player.setBlockinHotbar(6, "leaf");
 
 function RenderFrame(time) {
     if (time === undefined) time = 0;

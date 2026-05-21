@@ -13,6 +13,7 @@ const keys = {
 
     Enter: false,
     r: false,
+    b: false,
 };
 
 const mouse = {
