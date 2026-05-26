@@ -26,4 +26,5 @@ export const SETTINGS = {
     BLOCK_REACH: 5,
     TILE_SIZE: 128,
     SEED: 12345,
+    SPAWN_DISTANCE: 16,
 }

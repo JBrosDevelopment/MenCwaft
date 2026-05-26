@@ -692,6 +692,12 @@ class ChunkManager {
 
         return chunk.data[lx][wy][lz];
     }
+
+    worldLoaded() {
+        const allChunks = SETTINGS.RENDER_DISTANCE * 2;
+        console.log(`Loaded chunks: ${this.chunks.size}/${(allChunks + 1) ** 2}`);
+        return this.chunks.size >= allChunks;
+    }
 }
 
 function getAffectedChunks(wx, wy, wz) {

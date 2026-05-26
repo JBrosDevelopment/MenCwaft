@@ -24,8 +24,7 @@ const dayCycle = new ATMOSPHERE.DayCycle(scene);
 const chunkManager = new BLOCK_MANAGER.ChunkManager(scene, SETTINGS.SEED);
 chunkManager.loadWorld();
 
-const spawnDist = 16;
-const spawnPosition = BLOCK_MANAGER.TopPositionInWorld(-spawnDist, spawnDist, -spawnDist, spawnDist, chunkManager);
+const spawnPosition = BLOCK_MANAGER.TopPositionInWorld(-SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, -SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, chunkManager);
 chunkManager.update(spawnPosition);
 
 let player = new PLAYER_MANAGER.Player("Player1");
@@ -58,7 +57,6 @@ function RenderFrame(time) {
     
     if (currentChunkX !== lastChunkX || currentChunkZ !== lastChunkZ) {
         chunkManager.update(player.position);
-        player.physicsEnabled = true;
     }
     chunkManager.updateDirtyChunks();
 

@@ -29,7 +29,7 @@ class Player {
         this.lastWPressTime = 0;
         this.wWasDown = false;
 
-        this.physicsEnabled = false;
+        this.enablePhysics = true;
 
         this.camera = new THREE.PerspectiveCamera(75, SETTINGS.ASPECT_RATIO, 0.1, SETTINGS.CLIPPING_DISTANCE);
         this.camera.rotation.order = "YXZ";
@@ -42,7 +42,7 @@ class Player {
     moveX(delta, world) {
         const newX = this.position.x + this.velocity.x * delta;
 
-        if (!isColliding(world, newX, this.position.y, this.position.z, this.width, this.height) && this.physicsEnabled) {
+        if (!isColliding(world, newX, this.position.y, this.position.z, this.width, this.height) && this.enablePhysics) {
             if (this.isCrouching && this.isGrounded && !hasGroundBelow(world, newX, this.position.y, this.position.z, this.width)) {
                 // nothing
             } else {
@@ -54,7 +54,7 @@ class Player {
     moveY(delta, world) {
         const newY = this.position.y + this.velocity.y * delta;
 
-        if (!isColliding(world, this.position.x, newY, this.position.z, this.width, this.height) && this.position.y > 0 && this.physicsEnabled) {
+        if (!isColliding(world, this.position.x, newY, this.position.z, this.width, this.height) && this.position.y > 0 && this.enablePhysics) {
             this.position.y = newY;
         } else {
             if (this.velocity.y < 0) {
@@ -68,7 +68,7 @@ class Player {
     moveZ(delta, world) {
         const newZ = this.position.z + this.velocity.z * delta;
     
-        if (!isColliding(world, this.position.x, this.position.y, newZ, this.width, this.height) && this.physicsEnabled) {
+        if (!isColliding(world, this.position.x, this.position.y, newZ, this.width, this.height) && this.enablePhysics) {
             if (this.isCrouching && this.isGrounded && !hasGroundBelow(world, this.position.x, this.position.y, newZ, this.width)) {
                 // nothing
             } else {
@@ -131,7 +131,8 @@ class Player {
     }
 
     applyGravity(delta) {
-        this.velocity.y -= this.gravity * delta;
+        if (this.enablePhysics)
+            this.velocity.y -= this.gravity * delta;
     }
 
     handleJump() {
@@ -143,7 +144,11 @@ class Player {
 
     update(delta, world) {
         INPUT_MANAGER.updateRotation(this.rotation);
-    
+
+        if (this.position.y < -5) {
+            this.position = BLOCK_MANAGER.TopPositionInWorld(-SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, -SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, world);
+        }
+
         this.updateMovement(delta);
         this.handleJump();
         this.applyGravity(delta);
