@@ -16,7 +16,8 @@ const BLOCKS = {
 
 
 const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 128;
+const WORLD_HEIGHT = 96;
+const SEA_LEVEL = 28;
 const GROUND_LEVEL = 31;
 const CHUNK_GENERATION_HEIGHT = GROUND_LEVEL + 1;
 
@@ -166,6 +167,96 @@ function smoothstep(edge0, edge1, x) {
     return x * x * (3 - 2 * x);
 }
 
+function placeTree(chunkData, x, y, z, worldX, worldZ, terrainNoise) {
+    const trunkHeight = 2 + Math.floor((terrainNoise(worldX * 0.2, worldZ * 0.2) + 1) * 1.5);
+
+    // --- Trunk ---
+    for (let i = 0; i < trunkHeight; i++) {
+        if (y + i >= WORLD_HEIGHT) continue;
+        chunkData[x][y + i][z] = BLOCKS["log"];
+    }
+
+    const top = y + trunkHeight;
+
+    // --- 3×3 Leaf Square ---
+    for (let lx = -1; lx <= 1; lx++) {
+        for (let lz = -1; lz <= 1; lz++) {
+            const dx = x + lx;
+            const dy = top;
+            const dz = z + lz;
+
+            if (dx < 0 || dx >= CHUNK_SIZE ||
+                dy < 0 || dy >= WORLD_HEIGHT ||
+                dz < 0 || dz >= CHUNK_SIZE) continue;
+
+            if (chunkData[dx][dy][dz].id === 0) {
+                chunkData[dx][dy][dz] = BLOCKS["leaf"];
+            }
+        }
+    }
+
+    // --- Single Top Leaf ---
+    const topLeafY = top + 1;
+    if (topLeafY < WORLD_HEIGHT && chunkData[x][topLeafY][z].id === 0) {
+        chunkData[x][topLeafY][z] = BLOCKS["leaf"];
+    }
+}
+
+class TerrainPointInfo {
+    constructor(temperature, humidity, mountainFactor, desertFactor, forestFactor, plainsFactor, terrainHeight) {
+        this.temperature = temperature;
+        this.humidity = humidity;
+        this.mountainFactor = mountainFactor;
+        this.desertFactor = desertFactor;
+        this.forestFactor = forestFactor;
+        this.plainsFactor = plainsFactor;
+        this.terrainHeight = terrainHeight;
+    }
+}
+
+function getTerrainPointInfo(worldX, worldZ, terrainNoise, tempNoise, humidityNoise) {
+    // BIOME NOISE
+    const temperature = tempNoise(worldX * 0.001, worldZ * 0.001);
+    const humidity = humidityNoise(worldX * 0.001, worldZ * 0.001);
+
+    // BIOME BLENDING
+    const mountainFactor = smoothstep(-0.2, 0.4, -temperature); // Mountains appear in colder regions
+    const desertFactor = smoothstep(0.2, 0.7, temperature) * smoothstep(0.3, -0.3, humidity); // Deserts appear in hot + dry regions
+    const forestFactor = smoothstep(0.1, 0.7, humidity); // Forests appear in humid regions
+    let plainsFactor = 1.0 - Math.max(mountainFactor, desertFactor, forestFactor); // Plains are default
+    
+    plainsFactor = Math.max(plainsFactor, 0);
+
+    // DOMAIN WARPING
+    const warpX = terrainNoise(worldX * 0.002, worldZ * 0.002) * 30;
+    const warpZ = terrainNoise((worldX + 1000) * 0.002, (worldZ + 1000) * 0.002) * 30;
+
+    const nx = worldX + warpX;
+    const nz = worldZ + warpZ;
+
+    // BASE TERRAIN
+    const baseTerrain = fbm(terrainNoise, nx * 0.003, nz * 0.003, 5, 0.5, 2.0);
+    
+    // RIDGED MOUNTAINS
+    const mountains = ridgedFBM(terrainNoise, nx * 0.008, nz * 0.008, 5);
+
+    // BIOME HEIGHTS
+    const plainsHeight = baseTerrain * 8;
+    const forestHeight = baseTerrain * 12;
+    const desertHeight = baseTerrain * 5;
+    const mountainHeight = baseTerrain * 15 + mountains * 45;
+    
+    // FINAL BLENDED HEIGHT
+    const terrainHeight = Math.floor(
+            plainsHeight * plainsFactor +
+            forestHeight * forestFactor +
+            desertHeight * desertFactor +
+            mountainHeight * mountainFactor
+        ) + SEA_LEVEL;
+
+    return new TerrainPointInfo(temperature, humidity, mountainFactor, desertFactor, forestFactor, plainsFactor, terrainHeight);
+}
+
 function GenerateChunk(chunkX, chunkZ, terrainNoise, tempNoise, humidityNoise) {
 
     if (chunkX % CHUNK_SIZE != 0 || chunkZ % CHUNK_SIZE != 0) {
@@ -173,73 +264,39 @@ function GenerateChunk(chunkX, chunkZ, terrainNoise, tempNoise, humidityNoise) {
         return null;
     }
 
-    const SEA_LEVEL = 28;
-    const MAX_TREES_PER_CHUNK = 5;
-    let treesInChunk = 0;
+    const TREE_CELL_SIZE = 6;
 
     let chunkData = new Array(CHUNK_SIZE);
-
     for (let x = 0; x < CHUNK_SIZE; x++) {
 
         chunkData[x] = new Array(WORLD_HEIGHT);
 
         for (let y = 0; y < WORLD_HEIGHT; y++) {
             chunkData[x][y] = new Array(CHUNK_SIZE);
+            for (let z = 0; z < CHUNK_SIZE; z++) {
+                chunkData[x][y][z] = BLOCKS["air"];
+            }
         }
+    }
 
+    for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
+            
             const worldX = chunkX + x;
             const worldZ = chunkZ + z;
 
-            // BIOME NOISE
-            const temperature = tempNoise(worldX * 0.001, worldZ * 0.001);
-            const humidity = humidityNoise(worldX * 0.001, worldZ * 0.001);
-
-            // BIOME BLENDING
-            const mountainFactor = smoothstep(-0.2, 0.4, -temperature); // Mountains appear in colder regions
-            const desertFactor = smoothstep(0.2, 0.7, temperature) * smoothstep(0.3, -0.3, humidity); // Deserts appear in hot + dry regions
-            const forestFactor = smoothstep(0.1, 0.7, humidity); // Forests appear in humid regions
-            let plainsFactor = 1.0 - Math.max(mountainFactor, desertFactor, forestFactor); // Plains are default
-            
-            plainsFactor = Math.max(plainsFactor, 0);
-
-            // DOMAIN WARPING
-            const warpX = terrainNoise(worldX * 0.002, worldZ * 0.002) * 30;
-            const warpZ = terrainNoise((worldX + 1000) * 0.002, (worldZ + 1000) * 0.002) * 30;
-
-            const nx = worldX + warpX;
-            const nz = worldZ + warpZ;
-
-            // BASE TERRAIN
-            const baseTerrain = fbm(terrainNoise, nx * 0.003, nz * 0.003, 5, 0.5, 2.0);
-            
-            // RIDGED MOUNTAINS
-            const mountains = ridgedFBM(terrainNoise, nx * 0.008, nz * 0.008, 5);
-
-            // BIOME HEIGHTS
-            const plainsHeight = baseTerrain * 8;
-            const forestHeight = baseTerrain * 12;
-            const desertHeight = baseTerrain * 5;
-            const mountainHeight = baseTerrain * 15 + mountains * 45;
-            
-            // FINAL BLENDED HEIGHT
-            const terrainHeight = Math.floor(
-                    plainsHeight * plainsFactor +
-                    forestHeight * forestFactor +
-                    desertHeight * desertFactor +
-                    mountainHeight * mountainFactor
-                ) + SEA_LEVEL;
+            const tpi = getTerrainPointInfo(worldX, worldZ, terrainNoise, tempNoise, humidityNoise)
 
             // SURFACE BLOCKS
             let surfaceBlock = "gras";
             let subsurfaceBlock = "dir";
 
-            if (desertFactor > 0.5) {
+            if (tpi.desertFactor > 0.5) {
                 surfaceBlock = "san";
                 subsurfaceBlock = "san";
             }
 
-            if (mountainFactor > 0.6) {
+            if (tpi.mountainFactor > 0.6) {
                 surfaceBlock = "cob";
                 subsurfaceBlock = "cob";
             }
@@ -254,34 +311,47 @@ function GenerateChunk(chunkX, chunkZ, terrainNoise, tempNoise, humidityNoise) {
                     chunkData[x][y][z] = BLOCKS["bedroc"];
                 }
 
-                else if (y < terrainHeight - 4) {
+                else if (y < tpi.terrainHeight - 4) {
                     chunkData[x][y][z] = BLOCKS["cob"];
                 }
 
-                else if (y < terrainHeight) {
-                    if (mountainFactor > 0.6 && y < mountainCobHeight) {
+                else if (y < tpi.terrainHeight) {
+                    if (tpi.mountainFactor > 0.6 && y < mountainCobHeight) {
                         subsurfaceBlock = "dir"; // for mountains, transition from dir to cob
                     } 
                     chunkData[x][y][z] = BLOCKS[subsurfaceBlock];
                 }
 
-                else if (y === terrainHeight) {
-                    if (mountainFactor > 0.6 && y < mountainCobHeight) {
+                else if (y === tpi.terrainHeight) {
+                    if (tpi.mountainFactor > 0.6 && y < mountainCobHeight) {
                        surfaceBlock = "gras"; // for mountains, transition from gras to cob
                     } 
                     chunkData[x][y][z] = BLOCKS[surfaceBlock];
                 }
 
                 else {
-                    chunkData[x][y][z] = BLOCKS["air"];
+                    //chunkData[x][y][z] = BLOCKS["air"];
                 }
             }
 
             // TREES
-            const treeNoise = terrainNoise(worldX * 0.1, worldZ * 0.1);
-            if (forestFactor > 0.7 && treeNoise > 0.6 && MAX_TREES_PER_CHUNK > treesInChunk && terrainHeight < mountainCobHeight) {
-                chunkData[x][terrainHeight + 1][z] = BLOCKS["log"];
-                treesInChunk++;
+            const forestDensity = terrainNoise(worldX * 0.01, worldZ * 0.01);
+            
+            const cellX = Math.floor(worldX / TREE_CELL_SIZE);
+            const cellZ = Math.floor(worldZ / TREE_CELL_SIZE);
+            
+            const localX = Math.floor((terrainNoise(cellX * 17, cellZ * 17) + 1) * 0.5 * TREE_CELL_SIZE);
+            const localZ = Math.floor((terrainNoise(cellX * 29, cellZ * 29) + 1) * 0.5 * TREE_CELL_SIZE);
+            
+            const treeX = cellX * TREE_CELL_SIZE + localX;
+            const treeZ = cellZ * TREE_CELL_SIZE + localZ;
+            
+            if (worldX === treeX && worldZ === treeZ && tpi.forestFactor > 0.5 && forestDensity > 0.2 && tpi.terrainHeight < mountainCobHeight) {
+                const isOnChunkEdge = x === 0 || x === CHUNK_SIZE - 1 || z === 0 || z === CHUNK_SIZE - 1;
+                
+                if (!isOnChunkEdge) {
+                    placeTree(chunkData, x, tpi.terrainHeight + 1, z, worldX, worldZ, terrainNoise);
+                }
             }
         }
     }
@@ -604,6 +674,24 @@ class ChunkManager {
             chunk.data = GenerateChunk(chunk.x * CHUNK_SIZE, chunk.z * CHUNK_SIZE, this.terrainNoise, this.tempNoise, this.humidityNoise);
         }
     }
+
+    getBlock(wx, wy, wz) {
+        const cx = worldToChunkCoord(wx);
+        const cz = worldToChunkCoord(wz);
+        const lx = worldToLocal(wx);
+        const lz = worldToLocal(wz);
+
+        const key = chunkKey(cx, cz);
+        const chunk = this.chunks.get(key);
+        if (!chunk) return BLOCKS["air"];
+
+        if (wy < 0 || wy >= WORLD_HEIGHT) {
+            //console.warn(`Y coordinate ${wy} is out of bounds`);
+            return BLOCKS["air"];
+        }
+
+        return chunk.data[lx][wy][lz];
+    }
 }
 
 function getAffectedChunks(wx, wy, wz) {
@@ -623,6 +711,14 @@ function getAffectedChunks(wx, wy, wz) {
     return chunks;
 }
 
+function TopPositionInWorld(xmin, xmax, zmin, zmax, chunkManager) {
+    const x = Math.floor(Math.random() * (xmax - xmin) + xmin);
+    const z = Math.floor(Math.random() * (zmax - zmin) + zmin);
 
+    const tpi = getTerrainPointInfo(x, z, chunkManager.terrainNoise, chunkManager.tempNoise, chunkManager.humidityNoise);
+    const y = tpi.terrainHeight;
 
-export const BLOCK_MANAGER = { Chunk, ChunkManager, GenerateChunk, RenderChunk, worldToChunkCoord, chunkKey, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, GROUND_LEVEL, CHUNK_GENERATION_HEIGHT, FACE_DEFINITIONS };
+    return new THREE.Vector3(x, y + 2, z);
+}
+
+export const BLOCK_MANAGER = { Chunk, ChunkManager, TerrainPointInfo, GenerateChunk, RenderChunk, worldToChunkCoord, chunkKey, TopPositionInWorld, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, GROUND_LEVEL, CHUNK_GENERATION_HEIGHT, FACE_DEFINITIONS };

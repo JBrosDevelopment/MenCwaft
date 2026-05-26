@@ -11,8 +11,6 @@ BLOCK_OUTLINE.updateCrosshair();
 
 const scene = new THREE.Scene();
 
-const player = new PLAYER_MANAGER.Player("Player1");
-
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c") });
 renderer.setSize(SETTINGS.WIDTH, SETTINGS.HEIGHT);
 renderer.shadowMap.enabled = true;
@@ -25,9 +23,15 @@ const dayCycle = new ATMOSPHERE.DayCycle(scene);
 
 const chunkManager = new BLOCK_MANAGER.ChunkManager(scene, SETTINGS.SEED);
 chunkManager.loadWorld();
-chunkManager.update(player.position);
-let lastChunkX, lastChunkZ = 0;
 
+const spawnDist = 16;
+const spawnPosition = BLOCK_MANAGER.TopPositionInWorld(-spawnDist, spawnDist, -spawnDist, spawnDist, chunkManager);
+chunkManager.update(spawnPosition);
+
+let player = new PLAYER_MANAGER.Player("Player1");
+player.position.copy(spawnPosition);
+
+let lastChunkX, lastChunkZ = 0;
 let lastTime = 0;
 
 let blockOutlineData = BLOCK_OUTLINE.createBlockOutline(scene);
@@ -54,6 +58,7 @@ function RenderFrame(time) {
     
     if (currentChunkX !== lastChunkX || currentChunkZ !== lastChunkZ) {
         chunkManager.update(player.position);
+        player.physicsEnabled = true;
     }
     chunkManager.updateDirtyChunks();
 

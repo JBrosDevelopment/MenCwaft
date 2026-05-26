@@ -27,17 +27,19 @@ let yaw = 0;
 let pitch = 0;
   
 window.addEventListener("keydown", (e) => {
-    if (e.key in keys) keys[e.key] = true;
-    if (e.key === " ") keys.Space = true;
+    let key = e.key;
+    if (key.match(/^[A-Z]$/)) key = key.toLowerCase();
+    if (key in keys) keys[key] = true;
+    if (key === " ") keys.Space = true;
 
-    if (e.key === "Escape" && SETTINGS.LOCKED_IN) {
+    if (key === "Escape" && SETTINGS.LOCKED_IN) {
         SETTINGS.LOCKED_IN = false;
         document.exitPointerLock();
     }
 
     if (e.ctrlKey || e.metaKey) {
         const blockedKeys = ['s', 'p', 'w', 'r', 'a', 't']; 
-        if (blockedKeys.includes(e.key.toLowerCase())) {
+        if (blockedKeys.includes(key.toLowerCase())) {
             e.stopPropagation();
             e.preventDefault(); // Stop default browser action
         }
@@ -45,8 +47,10 @@ window.addEventListener("keydown", (e) => {
 });
   
 window.addEventListener("keyup", (e) => {
-    if (e.key in keys) keys[e.key] = false;
-    if (e.key === " ") keys.Space = false;
+    let key = e.key;
+    if (key.match(/^[A-Z]$/)) key = key.toLowerCase();
+    if (key in keys) keys[key] = false;
+    if (key === " ") keys.Space = false;
 });
 
 document.addEventListener("click", () => {
