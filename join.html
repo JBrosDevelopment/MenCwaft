@@ -58,16 +58,29 @@
 
 <button onclick="submitJoin()">Join</button>
 
-<script>
-function submitJoin() {
+<script type="module">
+import { doesServerExist } from "./src/networking/server.js";
+
+async function submitJoin() {
     const username = document.getElementById("username").value;
     const serverId = document.getElementById("serverId").value;
 
-    console.log("Joining server:", serverId, "as", username);
+    if (username.trim() === "" || serverId.trim() === "") {
+        alert("Please enter both a username and server ID.");
+        return;
+    }
+    
+    const exists = await doesServerExist(serverId);
 
-    // You can hook this into your WebRTC client:
-    // window.parent.startClientJoin(username, serverId);
+    if (!exists) {
+        alert("No server found with the given ID. Please check the ID and try again.");
+        return;
+    }
+
+    console.log("Joining server:", serverId, "as", username);
 }
+
+window.submitJoin = submitJoin;
 </script>
 
 </body>
