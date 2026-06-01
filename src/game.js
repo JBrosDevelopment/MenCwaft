@@ -59,6 +59,10 @@ function RenderFrame(time) {
         chunkManager.update(player.position);
     }
     chunkManager.updateDirtyChunks();
+    chunkManager.loadQueueTick();
+    if (chunkManager.loadQueue.size === 0) {
+        player.enablePhysics = true;
+    }
 
     lastChunkX = currentChunkX;
     lastChunkZ = currentChunkZ;

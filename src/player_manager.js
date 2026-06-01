@@ -29,7 +29,7 @@ class Player {
         this.lastWPressTime = 0;
         this.wWasDown = false;
 
-        this.enablePhysics = true;
+        this.enablePhysics = false;
 
         this.camera = new THREE.PerspectiveCamera(75, SETTINGS.ASPECT_RATIO, 0.1, SETTINGS.CLIPPING_DISTANCE);
         this.camera.rotation.order = "YXZ";

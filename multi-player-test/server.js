@@ -1,4 +1,4 @@
-import { Server } from "./networking/server.js";
+import { doesServerExist, Server } from "./networking/server.js";
 
 const server_id = document.getElementById('server_id');
 const start_btn = document.getElementById('start_btn');
@@ -50,3 +50,5 @@ function showMessage(from, message) {
     recieved.textContent += "[{" + from + "}]: " + message + '\n';
 }
 
+
+console.log(await doesServerExist("one1"));

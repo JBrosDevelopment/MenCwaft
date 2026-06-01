@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Host Server</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    body {
+        margin: 0;
+        background: #3b3b3b;
+        font-family: 'Press Start 2P', monospace;
+        color: white;
+        text-shadow: 2px 2px #000;
+        padding: 20px;
+    }
+
+    h2 {
+        margin-bottom: 20px;
+    }
+
+    .option {
+        margin-bottom: 25px;
+    }
+
+    label {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    input {
+        width: 95%;
+        padding: 10px;
+        font-size: 14px;
+        border: 3px solid #000;
+        background: #d9d9d9;
+    }
+
+    button {
+        margin-top: 10px;
+        width: 100%;
+        padding: 15px;
+        background: #4c7f4c;
+        border: 4px solid #2e4d2e;
+        color: white;
+        cursor: pointer;
+        font-family: 'Press Start 2P';
+    }
+
+    button:hover {
+        background: #6aa96a;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+        }
+
+        .switch input { 
+        opacity: 0;
+        width: 0;
+        height: 0;
+        }
+
+        .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ffcf30;
+        -webkit-transition: .4s;
+        transition: .4s;
+        }
+
+        .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: rgb(255, 255, 255);
+        -webkit-transition: .4s;
+        transition: .4s;
+        }
+
+        input:checked + .slider {
+        background-color: #2196F3;
+        }
+
+        input:focus + .slider {
+        box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .slider:before {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+        }
+</style>
+</head>
+<body>
+
+<h2>Host Server</h2>
+
+<div class="option">
+    <label>Server Name</label>
+    <input id="serverName" placeholder="My Awesome World">
+</div>
+
+<div class="option">
+    <label id="checkbox-label">Creating new Server</label>
+    <label class="switch">
+        <input type="checkbox" oninput="checkboxChanged()" checked>
+        <span class="slider"></span>
+      </label>
+</div>
+
+<div id="checked" style="display: none;" class="option">
+    <label>Only start server if no other server with this name is running</label>
+</div>
+
+<div id="unchecked" class="option">
+    <label>Seed Number</label>
+    <input id="seed" placeholder="123456789">
+</div>
+
+<button onclick="startServer()">Start Server</button>
+
+<script type="module">
+import { doesServerExist } from "./src/networking/server.js";
+
+const checkbox = document.querySelector(".switch input");
+const label = document.getElementById("checkbox-label");
+
+function checkboxChanged() {
+
+    if (checkbox.checked) {
+        label.textContent = "Creating new Server";
+    } else {
+        label.textContent = "Start an Already Created Server";
+    }
+
+    document.getElementById("unchecked").style.display = checkbox.checked ? "block" : "none";
+    document.getElementById("checked").style.display = checkbox.checked ? "none" : "block";
+}
+
+async function startServer() {
+    const name = document.getElementById("serverName").value;
+
+    if (name.trim() === "") {
+        alert("Please enter a valid server name.");
+        return;
+    }
+
+    const exists = await doesServerExist(name);
+
+    if (checkbox.checked) {
+        // Create new server
+        if (document.getElementById("seed").value.trim() === "") {
+            alert("Please enter a valid seed number.");
+            return;
+        }
+
+        if (exists) {
+            alert("A server with this name already exists. Please choose a different name or uncheck the box to start the existing server if it is not already running.");
+            return;
+        }
+    } else {
+        // Start existing server
+        if (!exists) {
+            alert("No server with this name exists. Please check the name or check the box to create a new server.");
+            return;
+        }
+    }
+
+    console.log("Starting server:", name);
+}
+
+window.startServer = startServer;
+window.checkboxChanged = checkboxChanged;
+</script>
+
+</body>
+</html>

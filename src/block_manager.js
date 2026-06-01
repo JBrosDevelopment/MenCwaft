@@ -362,10 +362,20 @@ function GenerateChunk(chunkX, chunkZ, terrainNoise, tempNoise, humidityNoise) {
 const ATLAS_SIZE = 8; // tiles per row
 const TILE_SIZE = 1 / ATLAS_SIZE;
 
+// Global
+const texture = new THREE.TextureLoader().load("Textures/" + SETTINGS.TEXTURE_PACK + "/blocks.png");
+texture.magFilter = THREE.NearestFilter;
+texture.minFilter = THREE.NearestFilter;
+texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+
+const chunkMaterial = new THREE.MeshStandardMaterial({
+    map: texture
+});
+
 /// Renders the specified chunk data at the given chunk coordinates
 /// chunkX and chunkZ are multiples of 16
 /// chunkData is a 3D matrix of block IDs, with dimensions [16][32][16]
-function RenderChunk(scene, chunkData, chunkX, chunkZ) {
+function BuildChunkGeometry(chunkData, chunkX, chunkZ) {
     if (chunkX % CHUNK_SIZE != 0 || chunkZ % CHUNK_SIZE != 0) {
         console.error(`Chunk coordinates: ${chunkX}, ${chunkZ} must be multiples of 16`);
         return;
@@ -375,13 +385,6 @@ function RenderChunk(scene, chunkData, chunkX, chunkZ) {
     const indices = [];
 
     let indexOffset = 0;
-
-    const texture = new THREE.TextureLoader().load("Textures/" + SETTINGS.TEXTURE_PACK + "/blocks.png");
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-
-    const material = new THREE.MeshStandardMaterial({map: texture});
 
     const uvs = [];
 
@@ -432,12 +435,7 @@ function RenderChunk(scene, chunkData, chunkX, chunkZ) {
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-
-    scene.add(mesh);
-    return mesh;
+    return geometry;
 }
 
 function addFace(positions, normals, uvs, indices, x, y, z, faceKey, block, indexOffset) {
@@ -509,6 +507,7 @@ class ChunkManager {
         this.chunks = new Map();
         this.modifiedChunks = new Map();
         this.seed = seed;
+        this.loadQueue = new Set();
 
         this.terrainNoise = createNoise2D(mulberry32(seed));
         this.tempNoise = createNoise2D(mulberry32(seed + 1));
@@ -528,9 +527,9 @@ class ChunkManager {
                 const key = chunkKey(cx, cz);
     
                 needed.add(key);
-    
+
                 if (!this.chunks.has(key)) {
-                    this.loadChunk(cx, cz);
+                    this.loadQueue.add(key);
                 }
             }
         }
@@ -550,35 +549,79 @@ class ChunkManager {
     }
 
     updateDirtyChunks() {
+        const MAX_REBUILDS = SETTINGS.RENDER_DISTANCE;
+    
+        let rebuilt = 0;
+    
         for (const chunk of this.chunks.values()) {
             if (!chunk.dirty) continue;
-        
+    
             this.rebuildChunk(chunk);
             chunk.dirty = false;
+    
+            rebuilt++;
+    
+            if (rebuilt >= MAX_REBUILDS) {
+                break;
+            }
+        }
+    }
+
+    loadQueueTick() {
+        const MAX_LOADS = 2;
+    
+        let loaded = 0;
+    
+        for (const key of this.loadQueue) {
+            const [cx, cz] = key.split(",").map(Number);
+    
+            this.loadChunk(cx, cz);
+    
+            this.loadQueue.delete(key);
+    
+            loaded++;
+    
+            if (loaded >= MAX_LOADS) {
+                break;
+            }
         }
     }
 
     rebuildChunk(chunk) {
         const wx = chunk.x * CHUNK_SIZE;
         const wz = chunk.z * CHUNK_SIZE;
-        
-        const mesh_rebuilt = RenderChunk(this.scene, chunk.data, wx, wz);
-
-        if (chunk.mesh) {
-            this.scene.remove(chunk.mesh);
-            chunk.mesh.geometry.dispose();
-            chunk.mesh.material.dispose();
-        }
     
-        chunk.mesh = mesh_rebuilt;
-    }    
+        // Build a new geometry only
+        const geometry = BuildChunkGeometry(chunk.data, wx, wz);
+    
+        if (!chunk.mesh) {
+            chunk.mesh = new THREE.Mesh(geometry, chunkMaterial);
+    
+            chunk.mesh.castShadow = true;
+            chunk.mesh.receiveShadow = true;
+    
+            this.scene.add(chunk.mesh);
+        } else {
+            const oldGeometry = chunk.mesh.geometry;
+    
+            chunk.mesh.geometry = geometry;
+    
+            oldGeometry.dispose();
+        }
+    }
     
     loadChunk(cx, cz) {
         const wx = cx * CHUNK_SIZE;
         const wz = cz * CHUNK_SIZE;
     
-        const data = GenerateChunk(wx, wz, this.terrainNoise, this.tempNoise, this.humidityNoise);
-
+        const data = GenerateChunk(
+            wx,
+            wz,
+            this.terrainNoise,
+            this.tempNoise,
+            this.humidityNoise
+        );
+    
         const key = chunkKey(cx, cz);
     
         if (this.modifiedChunks.has(key)) {
@@ -589,10 +632,24 @@ class ChunkManager {
                 data[lx][wy][lz] = block;
             }
         }
-        const mesh = RenderChunk(this.scene, data, wx, wz);
+
+        const geometry = BuildChunkGeometry(data, wx, wz);
+        
+        const chunk = new Chunk(
+            cx,
+            cz,
+            data,
+            new THREE.Mesh(geometry, chunkMaterial) // no mesh yet
+        );
     
-        const chunk = new Chunk(cx, cz, data, mesh);
-        this.chunks.set(chunkKey(cx, cz), chunk);
+        chunk.mesh.castShadow = true;
+        chunk.mesh.receiveShadow = true;
+
+        chunk.dirty = true;
+
+        this.scene.add(chunk.mesh);
+    
+        this.chunks.set(key, chunk);
     }
 
     unloadChunk(scene, key, chunk) {
@@ -727,4 +784,4 @@ function TopPositionInWorld(xmin, xmax, zmin, zmax, chunkManager) {
     return new THREE.Vector3(x, y + 2, z);
 }
 
-export const BLOCK_MANAGER = { Chunk, ChunkManager, TerrainPointInfo, GenerateChunk, RenderChunk, worldToChunkCoord, chunkKey, TopPositionInWorld, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, GROUND_LEVEL, CHUNK_GENERATION_HEIGHT, FACE_DEFINITIONS };
+export const BLOCK_MANAGER = { Chunk, ChunkManager, TerrainPointInfo, GenerateChunk, worldToChunkCoord, chunkKey, TopPositionInWorld, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, GROUND_LEVEL, CHUNK_GENERATION_HEIGHT, FACE_DEFINITIONS };
