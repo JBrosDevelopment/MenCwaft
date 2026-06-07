@@ -19,13 +19,17 @@ function logMessage(from, message) {
 }
 
 class Server {
-    constructor(onMessageFromClient, ondatachannelOpen, ondatachannelClose) {
+    constructor(onMessageFromClient, ondatachannelOpen, ondatachannelClose, onUsernameRequestSuccess, onUsernameRequestError, onClientDisconnect) {
         this.offerListenerUnsub = null;
         this.peers = new Map(); // clientId => { pc, dataChannel, subs }
         this.usernames = new Map(); // clientId => username (optional, for display purposes)
+        this.serverId = null;
         this.OnMessageFromClient = onMessageFromClient;
         this.OnDataChannelOpen = ondatachannelOpen;
         this.OnDataChannelClose = ondatachannelClose;
+        this.OnUsernameRequestSuccess = onUsernameRequestSuccess;
+        this.OnUsernameRequestError = onUsernameRequestError;
+        this.onClientDisconnect = onClientDisconnect;
     }
 
     async StartServer(serverId) {
@@ -46,6 +50,7 @@ class Server {
                 if (!data || !data.sdp) return;
                 if (this.peers.has(clientId)) return; // already handled
 
+                this.serverId = serverId;
                 this.handleOffer(serverId, clientId, data);
             });
         });
@@ -152,7 +157,7 @@ class Server {
         }
         this.usernames.delete(clientId);
 
-        const answerDocRef = doc(db, "servers", server_id.value, "answers", clientId);
+        const answerDocRef = doc(db, "servers", this.serverId, "answers", clientId);
         setTimeout(() => { /* best-effort delete; uncomment to enable deletion */
             answerDocRef.delete?.().catch(()=>{});
         }, 0);
@@ -190,10 +195,12 @@ class Server {
             if ([...this.usernames.values()].includes(username)) {
                 logMessage("ERROR", `Username ${username} is already taken. Client ${clientId} cannot use it.`);
                 ch.send(JSON.stringify({ type: "error-username-request", value: username }));
+                if (this.OnUsernameRequestError) this.OnUsernameRequestError(clientId, username);
                 return;
             }
             logMessage("INFO", `Client ${clientId} set username to ${username}`);
             this.usernames.set(clientId, username);
+            if (this.OnUsernameRequestSuccess) this.OnUsernameRequestSuccess(clientId, username);
             return;
         }
         else if (msgObj.type === "chat-message") {
@@ -205,6 +212,12 @@ class Server {
                     p.dataChannel.send(JSON.stringify({ type: "chat-message", from: username, value: msgObj.value }));
                 }
             }
+        }
+        else if (msgObj.type === "client-disconnect") {
+            logMessage("INFO", `Client ${clientId} requested disconnect.`);
+            if (this.onClientDisconnect) this.onClientDisconnect(clientId, msgObj.username);
+            this.cleanupPeer(clientId, "client requested disconnect");
+            return;
         }
         
 
@@ -247,7 +260,65 @@ export async function doesServerExist(serverId) {
         collection(db, "servers", serverId, "answers")
     );
 
-    return !answers.empty;
+    if (!answers.empty) {
+        return true;
+    }
+
+    // check if seed document exists
+    const serverDocRef = doc(db, "servers", serverId);
+    const serverDocSnap = await getDoc(serverDocRef);
+    
+    if (serverDocSnap.exists()) {
+        return true;
+    }
+
+    // check if created date is within last 24 hours (to account for recently created servers that haven't received offers/answers yet)
+    if (serverDocSnap.exists()) {
+        const data = serverDocSnap.data();
+        if (data.createdAt && data.createdAt.toDate) {
+            const createdAt = data.createdAt.toDate();
+            const now = new Date();
+            const diffHours = (now - createdAt) / (1000 * 60 * 60);
+            if (diffHours < 24) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+export async function createServer(serverId, seed) {
+    if (await doesServerExist(serverId)) {
+        console.error("Server with ID " + serverId + " already exists");
+        return null;
+    }
+    if (seed === undefined || seed === "") {
+        console.error("Seed is required to create a new server");
+        return null;
+    }
+    // create a firestore document for this server storing the seed
+    const serverDocRef = doc(db, "servers", serverId);
+    await setDoc(serverDocRef, { seed, createdAt: serverTimestamp() }).catch(e => {
+        console.error("Failed to create server document:", e);
+    });
+}
+
+export async function getSeed(serverId) {
+    if (await doesServerExist(serverId) === false) {
+        console.error("Server with ID " + serverId + " doesn't exists");
+        return null;
+    }
+    const serverDocRef = doc(db, "servers", serverId);
+    return await getDoc(serverDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.seed;
+        } else {
+            console.error("No server document found for ID:", serverId);
+            return null;
+        }
+    });
 }
 
 export { Server };

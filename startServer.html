@@ -133,10 +133,11 @@
 <button onclick="startServer()">Start Server</button>
 
 <script type="module">
-import { doesServerExist } from "./src/networking/server.js";
+import { doesServerExist, createServer } from "./src/networking/server.js";
 
 const checkbox = document.querySelector(".switch input");
 const label = document.getElementById("checkbox-label");
+const seedInput = document.getElementById("seed");
 
 function checkboxChanged() {
 
@@ -180,6 +181,12 @@ async function startServer() {
     }
 
     console.log("Starting server:", name);
+    if (checkbox.checked) {
+        // create new server with seed
+        await createServer(name, seedInput.value);
+    }
+
+    window.parent.location = `server.html?name=${encodeURIComponent(name)}`;
 }
 
 window.startServer = startServer;

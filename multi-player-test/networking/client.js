@@ -119,7 +119,7 @@ class Client {
 
     DisconnectFromServer() {
         if (this.dataChannel && this.dataChannel.readyState === "open") {
-            const disconnectMsg = JSON.stringify({ type: 'client-disconnect', id: this.clientId });
+            const disconnectMsg = JSON.stringify({ type: 'client-disconnect', id: this.clientId, username: this.username });
             this.dataChannel.send(disconnectMsg);
             this.dataChannel.close();
         }

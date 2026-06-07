@@ -568,7 +568,7 @@ class ChunkManager {
     }
 
     loadQueueTick() {
-        const MAX_LOADS = 2;
+        const MAX_LOADS = SETTINGS.RENDER_DISTANCE;
     
         let loaded = 0;
     
