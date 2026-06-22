@@ -2,12 +2,22 @@ import { Server, doesServerExist, getSeed } from "./networking/server.js";
 
 const serverName = document.getElementById('serverName');
 const seedValue = document.getElementById('seedValue');
+const playersOnline = document.getElementById('playersOnline');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
+const saveBtn = document.getElementById('saveBtn');
 const messageInput = document.getElementById('commandInput');
 const sendBtn = document.getElementById('sendBtn');
 const consoleContainer = document.getElementById('consoleContainer');
 const playerSelect = document.getElementById('playerSelect');
+// const dropZone = document.getElementById("dropZone");
+// const fileInput = document.getElementById("serverFileInput");
+const selectedFile = document.getElementById("selectedFile");
+const browseBtn = document.getElementById("browseBtn");
+const autoSaveSelect = document.getElementById("autoSaveSelect");
+
+let worldFileHandle = null;
+let worldData = null;
 
 serverName.textContent = window.location.search ? decodeURIComponent(window.location.search.split('=')[1]) : "Unnamed Server";
 if (await doesServerExist(serverName.textContent) === false) {
@@ -19,8 +29,6 @@ const seed = await getSeed(serverName.textContent);
 seedValue.textContent = seed;
 
 let server = new Server(OnMessageFromClient, OnDataChannelOpen, OnDataChannelClose, OnUsernameRequestSuccess, OnUsernameRequestError, OnClientDisconnect);
-
-startServer(serverName.textContent);
 
 startBtn.addEventListener('click', _ => startServer(serverName.textContent));
 stopBtn.addEventListener('click', _ => stopServer());
@@ -36,6 +44,10 @@ function startHTMLStart() {
     stopBtn.disabled = false;
     messageInput.disabled = false;
     sendBtn.disabled = false;
+    browseBtn.disabled = true;
+    // fileInput.disabled = true;
+    // dropZone.disabled = true;
+    saveBtn.disabled = false;
 }
 
 function stopHTMLStop() {
@@ -43,19 +55,37 @@ function stopHTMLStop() {
     stopBtn.disabled = true;
     messageInput.disabled = true;
     sendBtn.disabled = true;
+    browseBtn.disabled = false;
+    // fileInput.disabled = false;
+    // dropZone.disabled = false;
+    saveBtn.disabled = true;
 }
 
-function startServer(serverId) {
+async function startServer(serverId) {
+    if (worldFileHandle === null) {
+        alert("No server file selected.");
+        return;
+    }
     server.StartServer(serverId);
     serverName.textContent = serverId;
     showMessage("INFO", `Server "${serverId}" started. Waiting for clients to connect...`);
     startHTMLStart();
+    await updateAutoSave();
 }
 
-function stopServer() {
+async function stopServer() {
+    if (!server.isRunning()) return;
+
+    const save = confirm("Would you like to save the world before stopping the server?");
+
+    if (save) {
+        await saveFile();
+    }
+
     server.StopServer();
     showMessage("INFO", `Server stopped.`);
     stopHTMLStop();
+    await updateAutoSave();
 }
 
 function OnMessageFromClient(clientId, msgObj) {
@@ -70,16 +100,24 @@ function OnMessageFromClient(clientId, msgObj) {
 function OnDataChannelOpen(clientId) {
     showMessage("INFO", `Data channel with client ${clientId} is open`);
     startHTMLStart();
+    saveBtn.disabled = false;
 }
 
 function OnDataChannelClose(clientId) {
     showMessage("INFO", `Data channel with client ${clientId} is closed`);
-    stopHTMLStop();
+    
+    if (server.usernames.size === 0) {
+        saveBtn.disabled = true;
+        stopHTMLStop();
+    }
+    playersOnline.innerText = server.usernames.size;
 }
 
 function OnUsernameRequestSuccess(clientId, username) {
     showMessage("INFO", `Client ${clientId} set username to ${username}`);
     playerSelect.append(new Option(username));
+
+    playersOnline.innerText = server.usernames.size;
 }
 
 function OnUsernameRequestError(clientId, username) {
@@ -130,3 +168,148 @@ function sendCommand() {
 
     messageInput.value = "";
 }
+
+document.getElementById("browseBtn").addEventListener("click", openWorldFile);
+async function openWorldFile() {
+    try {
+        const [fileHandle] =
+            await window.showOpenFilePicker({
+                types: [{
+                    description: "World File",
+                    accept: {
+                        "application/json": [".json"]
+                    }
+                }]
+            });
+
+        worldFileHandle = fileHandle;
+
+        const file = await worldFileHandle.getFile();
+
+        const text = await file.text();
+
+        worldData = JSON.parse(text);
+
+        const fileNameWithoutExtension = serverName.textContent;
+        const fileNameExtension = ".mencwaft.world.json";
+        const checkFileName = fileNameWithoutExtension + fileNameExtension;
+        
+        if (checkFileName !== file.name) {
+            const result = confirm(`The file name "${file.name}" does not match the given server file "${checkFileName}". Do you want to continue?`);
+            if (!result) {
+                return;
+            }
+        }
+
+        selectedFile.textContent = "✓ " + file.name;
+
+        selectedFile.style.color = "#7CFC00";
+
+        showMessage("INFO", "Loaded world file: " + file.name);
+    } catch (err) {
+        if (err.name !== "AbortError") {
+            console.error(err);
+
+            showMessage("ERROR", "Failed to load world file.");
+        }
+    }
+}
+
+// function setSelectedFile(file) {
+//     if (isValidFile(file)) {
+//         selectedFile.textContent = "✓ " + file.name;
+//         selectedFile.style.color = "#7CFC00";
+
+//         worldFile = file;
+//     } else {
+//         selectedFile.textContent = "✗ Invalid file type. Please select a .json file.";
+//         selectedFile.style.color = "#ff4444";
+//     }
+// }
+
+
+// fileInput.addEventListener("change", () => {
+//     if (fileInput.files.length > 0) {
+//         setSelectedFile(fileInput.files[0]);
+//     }
+// });
+
+// dropZone.addEventListener("dragover", e => {
+//     e.preventDefault();
+//     if (server.isRunning()) {
+//         dropZone.classList.add("drag-over-bad");
+//     } else {
+//         dropZone.classList.add("drag-over");
+//     }
+// });
+
+// dropZone.addEventListener("dragleave", () => {
+//     if (server.isRunning()) {
+//         dropZone.classList.remove("drag-over-bad");
+//     } else {
+//         dropZone.classList.remove("drag-over");
+//     }
+// });
+
+// dropZone.addEventListener("drop", e => {
+//     e.preventDefault();
+//     if (server.isRunning()) {
+//         dropZone.classList.remove("drag-over-bad");
+//         return;
+//     }
+//     dropZone.classList.remove("drag-over");
+
+//     if (e.dataTransfer.files.length > 0) {
+//         fileInput.files = e.dataTransfer.files;
+//         setSelectedFile(e.dataTransfer.files[0]);
+//     }
+// });
+saveBtn.addEventListener("click", saveFile);
+
+autoSaveSelect.addEventListener("change", updateAutoSave);
+
+let autoSaveInterval = null;
+
+async function updateAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+    }
+
+    if (!server.isRunning()) return;
+
+    const value = autoSaveSelect.value;
+
+    if (value === "none") return;
+
+    const minutes = parseInt(value);
+
+    autoSaveInterval = setInterval(async () => {
+
+        if (server.isRunning()) {
+            await saveFile();
+        }
+
+    }, minutes * 60 * 1000);
+}
+
+async function saveFile() {
+    if (!worldFileHandle) {
+        showMessage("ERROR", "No world file loaded.");
+        return;
+    }
+
+    showMessage("INFO", "Saving server file...");
+
+    const writable = await worldFileHandle.createWritable();
+    await writable.write(JSON.stringify(worldData, null, 2));
+    await writable.close();
+
+    showMessage("INFO","Server saved.");
+}
+
+window.addEventListener("beforeunload", (event) => {
+    if (!server.isRunning()) return;
+    event.preventDefault();
+    event.returnValue = "";
+});

@@ -52,6 +52,21 @@
         background: #6aa96a;
     }
 
+    .create-server-btn {
+        margin-top: 10px;
+        width: 100%;
+        padding: 15px;
+        background: #cda626;
+        border: 4px solid #a88d08;
+        color: white;
+        cursor: pointer;
+        font-family: 'Press Start 2P';
+    }
+
+    .create-server-btn:hover {
+        background: #d9c85a;
+    }
+
     .switch {
         position: relative;
         display: inline-block;
@@ -72,7 +87,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: #ffcf30;
+        background-color: #2196F3;
         -webkit-transition: .4s;
         transition: .4s;
         }
@@ -90,7 +105,7 @@
         }
 
         input:checked + .slider {
-        background-color: #2196F3;
+            background-color: #ffcf30;
         }
 
         input:focus + .slider {
@@ -130,7 +145,8 @@
     <input id="seed" placeholder="123456789">
 </div>
 
-<button onclick="startServer()">Start Server</button>
+<button id="startServerBtn" onclick="startServer()" style="display: none;">Start Server</button>
+<button id="createServerFileBtn" onclick="createNewServer()" class="create-server-btn">Create Server</button>
 
 <script type="module">
 import { doesServerExist, createServer } from "./src/networking/server.js";
@@ -138,6 +154,8 @@ import { doesServerExist, createServer } from "./src/networking/server.js";
 const checkbox = document.querySelector(".switch input");
 const label = document.getElementById("checkbox-label");
 const seedInput = document.getElementById("seed");
+const startServerBtn = document.getElementById("startServerBtn");
+const createServerFileBtn = document.getElementById("createServerFileBtn");
 
 function checkboxChanged() {
 
@@ -149,6 +167,9 @@ function checkboxChanged() {
 
     document.getElementById("unchecked").style.display = checkbox.checked ? "block" : "none";
     document.getElementById("checked").style.display = checkbox.checked ? "none" : "block";
+
+    startServerBtn.style.display = checkbox.checked ? "none" : "block";
+    createServerFileBtn.style.display = checkbox.checked ? "block" : "none";
 }
 
 async function startServer() {
@@ -159,37 +180,61 @@ async function startServer() {
         return;
     }
 
-    const exists = await doesServerExist(name);
-
-    if (checkbox.checked) {
-        // Create new server
-        if (document.getElementById("seed").value.trim() === "") {
-            alert("Please enter a valid seed number.");
-            return;
-        }
-
-        if (exists) {
-            alert("A server with this name already exists. Please choose a different name or uncheck the box to start the existing server if it is not already running.");
-            return;
-        }
-    } else {
-        // Start existing server
-        if (!exists) {
-            alert("No server with this name exists. Please check the name or check the box to create a new server.");
-            return;
-        }
+    if (!await doesServerExist(name)) {
+        alert("No server with this name exists. Please check the name or check the box to create a new server.");
+        return;
     }
 
     console.log("Starting server:", name);
-    if (checkbox.checked) {
-        // create new server with seed
-        await createServer(name, seedInput.value);
-    }
 
     window.parent.location = `server.html?name=${encodeURIComponent(name)}`;
 }
 
+async function createNewServer() {
+    const name = document.getElementById("serverName").value;
+    const seed = document.getElementById("seed").value;
+
+    if (name.trim() === "") {
+        alert("Please enter a valid server name.");
+        return;
+    }
+
+    if (seed.trim() === "") {
+        alert("Please enter a valid seed number.");
+        return;
+    }
+
+    if (await doesServerExist(name)) {
+        alert("A server with this name already exists. Please choose a different name or uncheck the box to start the existing server if it is not already running.");
+        return;
+    }
+    
+    await createServer(name, seed);
+        
+    console.log("Creating server:", name, "Seed:", seed);
+
+    const newServerContent = {
+        name: name,
+        seed: seed,
+        blocks: []
+    };
+    const newServerContentStr = JSON.stringify(newServerContent);
+    const blob = new Blob([newServerContentStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${name}.mencwaft.world.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    checkbox.checked = false;
+    checkboxChanged();
+
+    document.getElementById("serverName").value = name;
+}
+
 window.startServer = startServer;
+window.createNewServer = createNewServer;
 window.checkboxChanged = checkboxChanged;
 </script>
 

@@ -32,6 +32,10 @@ class Server {
         this.onClientDisconnect = onClientDisconnect;
     }
 
+    isRunning() {
+        return this.offerListenerUnsub !== null;
+    }
+
     async StartServer(serverId) {
         if (serverId === "") {
             alert("Please enter a server ID");

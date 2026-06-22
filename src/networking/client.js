@@ -159,7 +159,7 @@ class Client {
 function beforeUnloadHandler(client) {
     try {
         if (client.dataChannel && client.dataChannel.readyState === 'open') {
-            client.dataChannel.send(JSON.stringify({ type: 'client-disconnect', id: client.clientId }));
+            client.dataChannel.send(JSON.stringify({ type: 'client-disconnect', id: client.clientId, username: client.username }));
             client.dataChannel.close();
         }
     } catch {}
