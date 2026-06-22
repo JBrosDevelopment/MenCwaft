@@ -216,7 +216,9 @@ async function createNewServer() {
     const newServerContent = {
         name: name,
         seed: seed,
-        blocks: []
+        blocks: [],
+        players: [],
+        entities: [],
     };
     const newServerContentStr = JSON.stringify(newServerContent);
     const blob = new Blob([newServerContentStr], { type: 'application/json' });

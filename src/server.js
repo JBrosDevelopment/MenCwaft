@@ -10,8 +10,6 @@ const messageInput = document.getElementById('commandInput');
 const sendBtn = document.getElementById('sendBtn');
 const consoleContainer = document.getElementById('consoleContainer');
 const playerSelect = document.getElementById('playerSelect');
-// const dropZone = document.getElementById("dropZone");
-// const fileInput = document.getElementById("serverFileInput");
 const selectedFile = document.getElementById("selectedFile");
 const browseBtn = document.getElementById("browseBtn");
 const autoSaveSelect = document.getElementById("autoSaveSelect");
@@ -45,8 +43,6 @@ function startHTMLStart() {
     messageInput.disabled = false;
     sendBtn.disabled = false;
     browseBtn.disabled = true;
-    // fileInput.disabled = true;
-    // dropZone.disabled = true;
     saveBtn.disabled = false;
 }
 
@@ -56,8 +52,6 @@ function stopHTMLStop() {
     messageInput.disabled = true;
     sendBtn.disabled = true;
     browseBtn.disabled = false;
-    // fileInput.disabled = false;
-    // dropZone.disabled = false;
     saveBtn.disabled = true;
 }
 
@@ -149,22 +143,51 @@ function showMessage(from, message) {
     consoleContainer.scrollTop = consoleContainer.scrollHeight;
 }
 
+function commandParser(message) {
+    const [cmd, ...args] = message.split(" ");
+    return { cmd, args };
+}
+
+function executeCommand(cmdInput) {
+    const { cmd, args } = cmdInput;
+    if (cmd == "/break-block") {
+        const [x, y, z] = args;
+        actionBreakBlock(x, y, z);
+    } else if (cmd == "/set-block") {
+        const [type, x, y, z] = args;
+        actionSetBlock(type, x, y, z);
+    }
+}
+
 function sendCommand() {
     if (!messageInput.value.trim()) return;
 
     const message = messageInput.value;
-    const msgObj = { type: "chat-message", from: "SERVER", value: message };
-    const msgStr = JSON.stringify(msgObj);
-    server.SendMessageToAll(msgStr);
-    messageInput.value = "";
-
     const target = playerSelect.value;
+    
     const line = document.createElement("div");
     line.className = "console-line";
     line.textContent = `[CMD -> ${target}] ${message}`;
-
+    
     consoleContainer.appendChild(line);
     consoleContainer.scrollTop = consoleContainer.scrollHeight;
+
+    console.log(message, message.startsWith("/"), message[0]);
+    if (message.startsWith("/")) {
+        console.log("Executing command");
+        const cmd = commandParser(message);
+        executeCommand(cmd);
+    } else {
+        const msgObj = { type: "chat-message", from: "SERVER", value: message };
+        const msgStr = JSON.stringify(msgObj);
+        
+        if (target == "all") {
+            server.SendMessageToAll(msgStr);
+        } else {
+            const clientId = server.getClientId(target);
+            server.SendMessageToClient(clientId, msgStr);
+        }
+    }
 
     messageInput.value = "";
 }
@@ -215,55 +238,6 @@ async function openWorldFile() {
     }
 }
 
-// function setSelectedFile(file) {
-//     if (isValidFile(file)) {
-//         selectedFile.textContent = "✓ " + file.name;
-//         selectedFile.style.color = "#7CFC00";
-
-//         worldFile = file;
-//     } else {
-//         selectedFile.textContent = "✗ Invalid file type. Please select a .json file.";
-//         selectedFile.style.color = "#ff4444";
-//     }
-// }
-
-
-// fileInput.addEventListener("change", () => {
-//     if (fileInput.files.length > 0) {
-//         setSelectedFile(fileInput.files[0]);
-//     }
-// });
-
-// dropZone.addEventListener("dragover", e => {
-//     e.preventDefault();
-//     if (server.isRunning()) {
-//         dropZone.classList.add("drag-over-bad");
-//     } else {
-//         dropZone.classList.add("drag-over");
-//     }
-// });
-
-// dropZone.addEventListener("dragleave", () => {
-//     if (server.isRunning()) {
-//         dropZone.classList.remove("drag-over-bad");
-//     } else {
-//         dropZone.classList.remove("drag-over");
-//     }
-// });
-
-// dropZone.addEventListener("drop", e => {
-//     e.preventDefault();
-//     if (server.isRunning()) {
-//         dropZone.classList.remove("drag-over-bad");
-//         return;
-//     }
-//     dropZone.classList.remove("drag-over");
-
-//     if (e.dataTransfer.files.length > 0) {
-//         fileInput.files = e.dataTransfer.files;
-//         setSelectedFile(e.dataTransfer.files[0]);
-//     }
-// });
 saveBtn.addEventListener("click", saveFile);
 
 autoSaveSelect.addEventListener("change", updateAutoSave);
@@ -313,3 +287,37 @@ window.addEventListener("beforeunload", (event) => {
     event.preventDefault();
     event.returnValue = "";
 });
+
+// FUNCTIONS:
+
+function actionBreakBlock(x, y, z) {
+    const blockObject = {
+        type: "air",
+        x: x,
+        y: y,
+        z: z
+    };
+
+    worldData.blocks.push(blockObject);
+
+    const msgObj = { type: "break-block", x: x, y: y, z: z };
+    const msgStr = JSON.stringify(msgObj);
+    server.SendMessageToAll(msgStr);
+    showMessage("INFO", `Break block at ${x}, ${y}, ${z}`);
+}
+
+function actionSetBlock(type, x, y, z) {
+    const blockObject = {
+        type: type,
+        x: x,
+        y: y,
+        z: z
+    };
+
+    worldData.blocks.push(blockObject);
+
+    const msgObj = { type: "set-block", type: type, x: x, y: y, z: z };
+    const msgStr = JSON.stringify(msgObj);
+    server.SendMessageToAll(msgStr);
+    showMessage("INFO", `Set block at ${x}, ${y}, ${z} to ${type}`);
+}

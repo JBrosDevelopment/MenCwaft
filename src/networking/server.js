@@ -36,6 +36,13 @@ class Server {
         return this.offerListenerUnsub !== null;
     }
 
+    getClientId(username) {
+        for (const [clientId, u] of this.usernames) {
+            if (u === username) return clientId;
+        }
+        return null;
+    } 
+
     async StartServer(serverId) {
         if (serverId === "") {
             alert("Please enter a server ID");
@@ -235,11 +242,8 @@ class Server {
     SendMessageToClient(clientId, message) {
         logMessage("INFO", `Sending message to ${clientId}: ${message}`);
         const state = this.peers.get(clientId);
-        logMessage("DEBUG", "1");
         if (!state) return;
-        logMessage("DEBUG", "2");
         state.dataChannel.send(message);
-        logMessage("DEBUG", "3");
     }
 
     SendMessageToAll(message) {
