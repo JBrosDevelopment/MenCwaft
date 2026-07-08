@@ -170,6 +170,7 @@ function beforeUnloadHandler(client) {
             deleteDoc(offerDocRef).catch(() => {});
         }
     } catch {}
+    client.DisconnectFromServer();
 }
 
 export { Client, beforeUnloadHandler };

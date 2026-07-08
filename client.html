@@ -1,0 +1,181 @@
+<head>    
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <script src="src/input_manager.js" type="module"></script>
+    <script src="src/settings.js" type="module"></script>
+    <script src="src/block_manager.js" type="module"></script>
+    <script src="src/atmosphere.js" type="module"></script>
+    <script src="src/player_manager.js" type="module"></script>
+    <script src="src/block_outline.js" type="module"></script>
+    <script src="src/boime_manager.js" type="module"></script>
+    <script src="src/game.js" type="module"></script>
+    <script src="src/client.js" type="module"></script>
+    <title>MenCwaft - The Game</title>
+</head>
+<style>
+#crosshair {
+    position: fixed;
+
+    width: 18px;
+    height: 18px;
+
+    z-index: 1000;
+    pointer-events: none;
+
+    filter: drop-shadow(0 0 2px black);
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: "";
+
+    position: absolute;
+    background: white;
+}
+
+#crosshair::before {
+    left: 8px;
+    top: 0;
+    width: 2px;
+    height: 18px;
+}
+
+#crosshair::after {
+    left: 0;
+    top: 8px;
+    width: 18px;
+    height: 2px;
+}
+#hotbar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    display: flex;
+    gap: 6px;
+
+    padding: 8px;
+    background: rgba(20, 20, 20, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+
+    z-index: 999;
+}
+
+.hotbar-slot {
+    width: 48px;
+    height: 48px;
+
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 18px;
+    color: white;
+    user-select: none;
+}
+
+.hotbar-slot.selected {
+    border-color: white;
+    background: rgba(255, 255, 255, 0.15);
+    border: 4px solid white;
+    padding: 1px;
+}
+
+#chatContainer {
+    position: fixed;
+    left: 20px;
+    top: 20px;
+
+    width: 500px;
+    height: 260px;
+
+    display: flex;
+    flex-direction: column;
+
+    z-index: 2000;
+
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+
+    backdrop-filter: blur(3px);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+#chatContainer.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#chatInputContainer {
+    position: fixed;
+    left: 20px;
+    bottom: 120px;
+
+    width: 500px;
+
+    display: none;
+    flex-direction: column;
+
+    z-index: 2000;
+}
+
+#chatInputContainer.open {
+    display: flex;
+}
+
+#chatConsole {
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 10px;
+
+    color: white;
+    font-family: monospace;
+    font-size: 15px;
+}
+
+.console-line {
+    margin-bottom: 4px;
+    text-shadow: 2px 2px 2px black;
+}
+
+#chatInput {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.15);
+
+    background: rgba(0,0,0,.6);
+
+    color: white;
+
+    font-size: 16px;
+
+    padding: 10px;
+    outline: none;
+}
+
+#chatInput::placeholder {
+    color: #bbb;
+}
+</style>
+<body>
+    <div id="crosshair"></div>
+    <div id="hotbar"></div>
+
+    <div id="chatContainer">
+        <div id="chatConsole"></div>
+    </div>
+    <div id="chatInputContainer">
+        <input id="chatInput" type="text" placeholder="Type a message..." autocomplete="off">
+    </div>
+    
+</body>
+<canvas id="c"></canvas>

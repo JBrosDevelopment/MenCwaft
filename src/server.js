@@ -339,7 +339,7 @@ function actionSetBlock(type, x, y, z) {
 
     worldData.blocks.push(blockObject);
 
-    const msgObj = { type: "set-block", type: type, x: x, y: y, z: z };
+    const msgObj = { type: "set-block", block: type, x: x, y: y, z: z };
     const msgStr = JSON.stringify(msgObj);
     server.SendMessageToAll(msgStr);
     showMessage("INFO", `Set block at ${x}, ${y}, ${z} to ${type}`);

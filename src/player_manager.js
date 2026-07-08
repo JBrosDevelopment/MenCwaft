@@ -142,15 +142,20 @@ class Player {
         }
     }
 
-    update(delta, world) {
+    update(delta, world, isMenuVisible) {
         INPUT_MANAGER.updateRotation(this.rotation);
 
         if (this.position.y < -5) {
             this.position = BLOCK_MANAGER.TopPositionInWorld(-SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, -SETTINGS.SPAWN_DISTANCE, SETTINGS.SPAWN_DISTANCE, world);
         }
 
-        this.updateMovement(delta);
-        this.handleJump();
+        if (isMenuVisible) {
+            this.velocity.x = 0;
+            this.velocity.z = 0;
+        } else {
+            this.updateMovement(delta);
+            this.handleJump();
+        }
         this.applyGravity(delta);
     
         this.moveX(delta, world);
@@ -173,6 +178,7 @@ class Player {
             this.placeBlock(world);
         }
 
+        let lastSelectedIndex = this.selectedBlockIndex;
         if (INPUT_MANAGER.mouse.scrollDelta !== 0) {
             const scrollDirection = Math.sign(INPUT_MANAGER.mouse.scrollDelta);
             this.selectedBlockIndex = (this.selectedBlockIndex + scrollDirection + 9) % 9;
@@ -181,7 +187,9 @@ class Player {
             }
             INPUT_MANAGER.mouse.scrollDelta = 0;
         }
-        updateHotbar(this);
+        if (lastSelectedIndex !== this.selectedBlockIndex) {
+            updateHotbar(this);
+        }
     }
 
     setBlockinHotbar(index, blockType) {

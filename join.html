@@ -78,6 +78,7 @@ async function submitJoin() {
     }
 
     console.log("Joining server:", serverId, "as", username);
+    window.parent.location = `client.html?server=${serverId}&username=${username}`;
 }
 
 window.submitJoin = submitJoin;
