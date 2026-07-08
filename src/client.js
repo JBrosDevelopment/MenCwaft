@@ -5,6 +5,12 @@ const chatContainer = document.getElementById("chatContainer");
 const chatInputContainer = document.getElementById("chatInputContainer");
 const chatConsole = document.getElementById("chatConsole");
 const chatInput = document.getElementById("chatInput");
+const loadingScreen = document.getElementById("loadingScreen");
+const loadingBarContainer = document.getElementById("loadingBarContainer");
+const loadingServerName = document.getElementById("loadingServerName");
+const loadingPlayerName = document.getElementById("loadingPlayerName");
+const loadingTip = document.getElementById("loadingTip");
+const loadingText = document.getElementById("loadingText");
 
 function getParamFromUrl(param) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -19,10 +25,80 @@ if (!server_id || !username) {
     throw new Error("Missing server or username parameter in the URL.");
 }
 
-let game = GAME.init(username, false); // { scene, renderer, dayCycle, chunkManager, player, blockOutlineData, isSinglePlayerGame, isMenuVisible }
+loadingServerName.innerText = server_id;
+loadingPlayerName.innerText = username;
 
+let gameHasLoaded = false;
 let chatOpen = false;
 let consoleHideTimer = null;
+
+let loadingTipInterval = null;
+
+const loadingTips = [
+    "Punching trees since forever...",
+    "Definitely not spawning a creeper behind you.",
+    "Mining straight down is always a great idea.",
+    "Looking for diamonds...",
+    "Feeding the cows...",
+    "Trying not to anger the Enderman.",
+    "Crafting another wooden pickaxe...",
+    "Putting the lid back on the lava.",
+    "Asking villagers for directions...",
+    "Digging one more block...",
+    "Planting suspicious amounts of wheat...",
+    "Untangling the redstone...",
+    "Teaching zombies how doors work...",
+    "Waiting for the furnace...",
+    "Counting chickens...",
+    "Replacing the dirt you accidentally mined.",
+    "Checking under every suspicious gravel block.",
+    "Keeping creepers socially distant.",
+    "Making sure the bed isn't occupied.",
+    "Polishing the diamonds...",
+    "Trying to remember where home is.",
+    "Looking for the last missing sheep.",
+    "Convincing skeletons to miss.",
+    "Avoiding fall damage... probably.",
+    "Wondering who left this giant hole.",
+    "Searching every cave except the right one.",
+    "Making another chest...",
+    "Sorting the unsorted storage room...",
+    "Building a dirt pillar to safety.",
+    "Accidentally crafting buttons.",
+    "Asking the pig for life advice.",
+    "Waiting for the chunks to catch up.",
+    "Pretending gold tools are useful.",
+    "Checking if it's daytime yet.",
+    "Running from spiders...",
+    "Trying not to fall into lava.",
+    "Looking for that one missing torch.",
+    "Collecting blocks you'll never use.",
+    "Protecting your precious dirt blocks.",
+    "Generating blocky goodness..."
+];
+
+function startLoadingTips() {
+    let current = Math.floor(Math.random() * loadingTips.length);;
+
+    loadingTip.textContent = loadingTips[current];
+    loadingTipInterval = setInterval(() => {
+        let next = current;
+        // Prevent the same tip from appearing twice in a row
+        while (next === current) {
+            next = Math.floor(Math.random() * loadingTips.length);
+        }
+
+        current = next;
+        loadingTip.textContent = loadingTips[current];
+    }, 5000);
+}
+
+function stopLoadingTips() {
+    clearInterval(loadingTipInterval);
+    loadingTipInterval = null;
+}
+
+startLoadingTips();
 
 function showConsole() {
 
@@ -41,6 +117,10 @@ function showConsole() {
 
 document.addEventListener("keydown", (e) => {
     if (e.target !== document.body && e.target !== chatInput) {
+        return;
+    }
+
+    if (!gameHasLoaded) {
         return;
     }
 
@@ -84,10 +164,18 @@ window.addEventListener('beforeunload', () => beforeUnloadHandler(client));
 
 function onDataChannelOpen() {
     showMessage("INFO", "Data channel is open! You can now send messages.");
+    stopLoadingTips();
+    loadingBarContainer.classList.add("visible");
+    loadingText.textContent = "Loading game";
+    startGame();
 }
 
 function onDataChannelClose() {
     showMessage("INFO", "Data channel is closed.");
+    startLoadingTips();
+    loadingBarContainer.classList.remove("visible");
+    client.ConnectToServer(server_id, username);
+    loadingText.textContent = "Waiting to connect";
 }
 
 function sendMessage() {
@@ -132,4 +220,11 @@ function showMessage(from, message) {
     showConsole();
 }
 
-GAME.RenderFrame(performance.now(), game);
+function startGame() {
+    let game = GAME.init(username, false); // { scene, renderer, dayCycle, chunkManager, player, blockOutlineData, isSinglePlayerGame, isMenuVisible }
+
+    // TODO
+    // generate chunks before closing the loading screen...
+
+    GAME.RenderFrame(performance.now(), game);
+}
