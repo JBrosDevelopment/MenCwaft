@@ -16,6 +16,7 @@ const autoSaveSelect = document.getElementById("autoSaveSelect");
 
 let worldFileHandle = null;
 let worldData = null;
+let lastCommand = null;
 
 serverName.textContent = window.location.search ? decodeURIComponent(window.location.search.split('=')[1]) : "Unnamed Server";
 if (await doesServerExist(serverName.textContent) === false) {
@@ -152,10 +153,29 @@ function executeCommand(cmdInput) {
     const { cmd, args } = cmdInput;
     if (cmd == "/break-block") {
         const [x, y, z] = args;
+        if (x === undefined || y === undefined || z === undefined) {
+            showMessage("ERROR", "Invalid arguments for /break-block. Usage: /break-block <x> <y> <z>");
+            return;
+        }
         actionBreakBlock(x, y, z);
     } else if (cmd == "/set-block") {
         const [type, x, y, z] = args;
+        if (x === undefined || y === undefined || z === undefined) {
+            showMessage("ERROR", "Invalid arguments for /set-block. Usage: /set-block <type> <x> <y> <z>");
+            return;
+        }
         actionSetBlock(type, x, y, z);
+    } else if (cmd == "/again") {
+        if (lastCommand) {
+            const lc = lastCommand;
+            console.log("Executing last command: " + lc);
+            messageInput.value = lastCommand;
+            sendCommand();
+            console.log("Executed last command: " + lc);
+            lastCommand = lc;
+        } else {
+            showMessage("INFO", "No last command found.");
+        }
     }
 }
 
@@ -189,6 +209,9 @@ function sendCommand() {
         }
     }
 
+    if (message.trim() !== "/again") {
+        lastCommand = message;
+    }
     messageInput.value = "";
 }
 
