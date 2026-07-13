@@ -19,6 +19,7 @@ class Game {
         this.lastTime = 0;
         this.isSinglePlayerGame = isSinglePlayerGame;
         this.isMenuVisible = false;
+        this.OnPressO = null;
     }
 }
 
@@ -65,8 +66,6 @@ function init(name, isSinglePlayerGame) {
     return new Game(scene, renderer, dayCycle, chunkManager, player, blockOutlineData, isSinglePlayerGame);
 }
 
-let game = init("Player1", true);
-
 function RenderFrame(time, Game) {
     if (time === undefined) time = 0;
     const delta = (time - Game.lastTime) / 1000;
@@ -100,12 +99,25 @@ function RenderFrame(time, Game) {
         console.log("World reset!");
     }
 
+    if (INPUT_MANAGER.isKeyPressed("o")) { // this isnt working properly, and on client.js side it isnt either
+        let target = BLOCK_OUTLINE.getTargetBlock(Game.player.camera, Game.scene, Game.blockOutlineData.ray);
+        if (target) {
+            let coord = target.point.clone()
+                .add(target.face.normal.clone().multiplyScalar(-0.5))
+                .floor();
+                
+            if (Game.OnPressO) Game.OnPressO("" + coord.x + " " + coord.y + " " + coord.z);
+        }
+    }
+
     BLOCK_OUTLINE.updateBlockOutline(Game.player.camera, Game.scene, Game.blockOutlineData);
 
     Game.player.update(delta, Game.chunkManager, Game.isMenuVisible);
 
     Game.renderer.render(Game.scene, Game.player.camera);
 }
+
+let game = init("Player1", true);
 
 RenderFrame(performance.now(), game);
 

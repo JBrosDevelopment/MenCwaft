@@ -12,6 +12,8 @@ const loadingPlayerName = document.getElementById("loadingPlayerName");
 const loadingTip = document.getElementById("loadingTip");
 const loadingText = document.getElementById("loadingText");
 
+let game = new GAME.Game();
+
 function getParamFromUrl(param) {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(param);
@@ -220,11 +222,19 @@ function showMessage(from, message) {
     showConsole();
 }
 
-function startGame() {
-    let game = GAME.init(username, false); // { scene, renderer, dayCycle, chunkManager, player, blockOutlineData, isSinglePlayerGame, isMenuVisible }
+async function startGame() {
+    game = GAME.init(username, false);
+    game.OnPressO = (coord) => {
+        showMessage("o", coord);
+    }
 
-    // TODO
-    // generate chunks before closing the loading screen...
-
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
     GAME.RenderFrame(performance.now(), game);
+    setTimeout(() => {
+
+        loadingScreen.classList.add("hidden");
+        gameHasLoaded = true;
+
+    }, 2500);
 }

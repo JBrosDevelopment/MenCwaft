@@ -674,6 +674,23 @@ class ChunkManager {
     }
 
     setBlock(wx, wy, wz, block) {
+        wx = Number(wx);
+        wy = Number(wy);
+        wz = Number(wz);
+
+        if (!Number.isInteger(wx) || !Number.isInteger(wy) || !Number.isInteger(wz) ||
+            wy < 0 || wy >= WORLD_HEIGHT) {
+            console.warn("Ignoring block update with invalid coordinates:", wx, wy, wz);
+            return false;
+        }
+
+        // Network messages use block names; chunk data must contain block definitions.
+        const blockDefinition = typeof block === "string" ? BLOCKS[block] : block;
+        if (!blockDefinition || !Number.isInteger(blockDefinition.id)) {
+            console.warn("Ignoring block update with an unknown block:", block);
+            return false;
+        }
+
         const cx = worldToChunkCoord(wx);
         const cz = worldToChunkCoord(wz);
         const lx = worldToLocal(wx);
@@ -681,9 +698,9 @@ class ChunkManager {
     
         const key = chunkKey(cx, cz);
         const chunk = this.chunks.get(key);
-        if (!chunk) return;
+        if (!chunk) return false;
         
-        chunk.data[lx][wy][lz] = block;
+        chunk.data[lx][wy][lz] = blockDefinition;
         chunk.dirty = true;
 
         for (const [nx, nz] of getAffectedChunks(wx, wy, wz)) {
@@ -696,7 +713,8 @@ class ChunkManager {
         }
 
         const edits = this.modifiedChunks.get(key);
-        edits.set(`${lx},${wy},${lz}`, block);
+        edits.set(`${lx},${wy},${lz}`, blockDefinition);
+        return true;
     }
 
     saveWorld() {

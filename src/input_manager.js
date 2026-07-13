@@ -15,6 +15,7 @@ const keys = {
     r: false,
     b: false,
     p: false,
+    o: false,
 };
 
 const mouse = {

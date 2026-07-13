@@ -44,20 +44,25 @@ function getTargetBlock(camera, scene, raycaster) {
 }
 
 function updateBlockOutline(camera, scene, blockOutline) {
-    const hit = getTargetBlock(camera, scene, blockOutline.ray);
-
-    if (!hit) {
-        blockOutline.outline.visible = false;
-        return;
+    try {
+        const hit = getTargetBlock(camera, scene, blockOutline.ray);
+        
+        if (!hit) {
+            blockOutline.outline.visible = false;
+            return;
+        }
+        
+        const pos = hit.point.clone()
+            .add(hit.face.normal.clone().multiplyScalar(-0.5))
+            .floor()
+            .addScalar(0.5);
+            
+        blockOutline.outline.position.copy(pos);
+        blockOutline.outline.visible = true;
     }
+    catch {
 
-    const pos = hit.point.clone()
-        .add(hit.face.normal.clone().multiplyScalar(-0.5))
-        .floor()
-        .addScalar(0.5);
-
-    blockOutline.outline.position.copy(pos);
-    blockOutline.outline.visible = true;
+    }
 }
 
 
