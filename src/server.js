@@ -10,6 +10,7 @@ const messageInput = document.getElementById('commandInput');
 const sendBtn = document.getElementById('sendBtn');
 const consoleContainer = document.getElementById('consoleContainer');
 const playerSelect = document.getElementById('playerSelect');
+const playerList = document.getElementById('playerList');
 const selectedFile = document.getElementById("selectedFile");
 const browseBtn = document.getElementById("browseBtn");
 const autoSaveSelect = document.getElementById("autoSaveSelect");
@@ -84,11 +85,20 @@ async function stopServer() {
 }
 
 function OnMessageFromClient(clientId, msgObj) {
+    const username = server.GetUsername(clientId);
     if (msgObj.type === "chat-message") {
         showMessage(msgObj.from, msgObj.value);
     } else {
-        const username = server.GetUsername(clientId);
         showMessage(username, JSON.stringify(msgObj));
+    }
+
+    // echo message back to all other clients (not to the sender client)
+    const msgStr = JSON.stringify(msgObj);
+    for (const [otherId, p] of server.peers) {
+        if (otherId !== clientId && p.dataChannel && p.dataChannel.readyState === "open") {
+            console.log(`Sending message to client ${otherId}: ${msgStr}`);
+            p.dataChannel.send(msgStr);
+        }
     }
 }
 
@@ -111,6 +121,13 @@ function OnDataChannelClose(clientId) {
 function OnUsernameRequestSuccess(clientId, username) {
     showMessage("INFO", `Client ${clientId} set username to ${username}`);
     playerSelect.append(new Option(username));
+    
+    const playerDiv = document.createElement("div");
+    playerDiv.textContent = username;
+    playerDiv.className = "player";
+    playerDiv.id = `player-${clientId}`;
+
+    playerList.appendChild(playerDiv);
 
     playersOnline.innerText = server.usernames.size;
 }
@@ -121,6 +138,8 @@ function OnUsernameRequestError(clientId, username) {
 
 function OnClientDisconnect(clientId, username) {
     showMessage("INFO", `Client ${clientId} with username ${username} has disconnected.`);
+
+    playerList.removeChild(document.getElementById(`player-${clientId}`));
     
     let found = false;
     for (let i = 0; i < playerSelect.options.length; i++) {
@@ -303,6 +322,8 @@ async function saveFile() {
     await writable.close();
 
     showMessage("INFO","Server saved.");
+
+    server.SendMessageToAll(JSON.stringify({ type: "server-saved" }));
 }
 
 window.addEventListener("beforeunload", (event) => {

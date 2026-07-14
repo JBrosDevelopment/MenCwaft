@@ -37,6 +37,8 @@ class Player {
         this.blockCooldown = 0;
         this.selectedBlockIndex = 0;
         this.hotbar = new Array(9).fill(null);
+
+        this.client = null;
     }
 
     moveX(delta, world) {
@@ -225,6 +227,15 @@ class Player {
         if (!target) return;
     
         const { x, y, z } = getBlockCoords(target, false);
+        
+        if (this.client) {
+            this.client.sendMessageObj(JSON.stringify({
+                type: "break-block",
+                x: x,
+                y: y,
+                z: z
+            }));
+        };
     
         world.setBlock(x, y, z, BLOCK_MANAGER.BLOCKS["air"]);
     }
@@ -266,6 +277,16 @@ class Player {
 
         if (intersects)
             return;
+        
+        if (this.client) {
+            this.client.sendMessageObj(JSON.stringify({
+                type: "set-block",
+                x: x,
+                y: y,
+                z: z,
+                block: blockType
+            }));
+        };
 
         world.setBlock(x, y, z, BLOCK_MANAGER.BLOCKS[blockType]); 
     }

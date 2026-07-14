@@ -135,6 +135,16 @@ class Client {
         this.dataChannel.send(JSON.stringify(msgObj));
         logMessage("ME", message);
     }
+
+    sendMessageObj(msgObj) {
+        if (!this.dataChannel || this.dataChannel.readyState !== "open") {
+            logMessage("ERROR", "Not connected / data channel not open");
+            return;
+        }
+
+        this.dataChannel.send(msgObj);
+        console.log("[ME]: ", msgObj);
+    }
     
     sendObject(obj) {
         if (!this.dataChannel || this.dataChannel.readyState !== "open") {

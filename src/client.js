@@ -1,5 +1,7 @@
 import * as GAME from "./game.js";
 import { Client, beforeUnloadHandler } from "./networking/client.js";
+import { SETTINGS } from "./settings.js";
+import { doesServerExist, getSeed } from "./networking/server.js";
 
 const chatContainer = document.getElementById("chatContainer");
 const chatInputContainer = document.getElementById("chatInputContainer");
@@ -29,6 +31,11 @@ if (!server_id || !username) {
 
 loadingServerName.innerText = server_id;
 loadingPlayerName.innerText = username;
+
+if (!(await doesServerExist(server_id))) {
+    alert(`Server with ID ${server_id} does not exist.`);
+    window.location.href = "index.html";
+}
 
 let gameHasLoaded = false;
 let chatOpen = false;
@@ -200,7 +207,10 @@ function OnMessageFromServer(evt) {
             game.chunkManager.setBlock(msgObj.x, msgObj.y, msgObj.z, msgObj.block);
         } else if (msgObj.type === "break-block") {
             game.chunkManager.setBlock(msgObj.x, msgObj.y, msgObj.z, "air");
-        } else {
+        } else if (msgObj.type === "server-saved") {
+            showMessage("INFO", "Server has been saved.");
+        }
+        else {
             showMessage("INFO", `Received unknown message type from server: ${evt.data}`);
         }
     } catch (e) {
@@ -227,6 +237,11 @@ async function startGame() {
     game.OnPressO = (coord) => {
         showMessage("o", coord);
     }
+
+    const seed = await getSeed(server_id);
+    SETTINGS.SEED = seed;
+
+    game.player.client = client;
 
     await new Promise(resolve => setTimeout(resolve, 2500));
     
